@@ -55,11 +55,16 @@ uv sync
 uv run playwright install chromium
 ```
 
-> **WSL users:** if you get `Exec format error`, install system Node.js first:
+> **WSL users:** if you get `Exec format error`, Playwright's bundled Node can't run on WSL. Fix:
 > ```bash
-> curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-> sudo apt-get install -y nodejs
-> uv run playwright install chromium
+> # Install system Node
+> sudo apt-get update && sudo apt-get install -y nodejs
+>
+> # Tell Playwright to use system Node instead of its bundled binary
+> PLAYWRIGHT_NODEJS_PATH=$(which node) uv run playwright install chromium
+>
+> # Add to .env so evidence capture works at runtime too
+> echo "PLAYWRIGHT_NODEJS_PATH=$(which node)" >> .env
 > ```
 > You can skip this step entirely — evidence capture is optional. All audit, AI, and export features work without it.
 
