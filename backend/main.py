@@ -630,6 +630,40 @@ async def list_groq_models(api_key: str = ""):
         raise HTTPException(500, str(e))
 
 
+@app.get("/api/ai/anthropic-models")
+async def list_anthropic_models(api_key: str = ""):
+    """
+    Fetch available models from the Anthropic API.
+    Returns a list of LiteLLM-formatted model strings.
+    """
+    import httpx
+    key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key:
+        raise HTTPException(400, "Anthropic API key required.")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                "https://api.anthropic.com/v1/models",
+                headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
+            )
+        resp.raise_for_status()
+        data = resp.json()
+        _skip = ("moderation", "embedding")
+        models = sorted([
+            {"name": m.get("display_name", m["id"]),
+             "litellm": m["id"]}
+            for m in data.get("data", [])
+            if not any(s in m["id"].lower() for s in _skip)
+        ], key=lambda x: x["litellm"], reverse=True)
+        return {"models": models}
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(e.response.status_code, f"Anthropic API error: {e.response.text[:200]}")
+    except httpx.RequestError as e:
+        raise HTTPException(503, f"Cannot reach Anthropic API: {e}")
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @app.get("/api/ai/ollama-models")
 async def list_ollama_models(base_url: str = "http://localhost:11434"):
     """

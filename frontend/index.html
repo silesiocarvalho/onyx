@@ -1090,7 +1090,7 @@ function activatePhase(n) {
 
 // ── AI Provider UI ──────────────────────────────────────
 const PROVIDER_DEFAULTS = {
-  anthropic: { model: 'claude-sonnet-4-6', hint: 'claude-sonnet-4-6 · claude-haiku-4-5',     key: true,  url: false, discover: false },
+  anthropic: { model: '',                  hint: 'Click Discover ↺ to list available models', key: true,  url: false, discover: 'anthropic' },
   openai:    { model: 'gpt-4o',            hint: 'gpt-4o · gpt-4o-mini · o1-mini',           key: true,  url: false, discover: false },
   ollama:    { model: '',                  hint: 'Click Discover ↺ to list installed models', key: false, url: true,  discover: 'ollama' },
   groq:      { model: '',                  hint: 'Click Discover ↺ to list available models', key: true,  url: false, discover: 'groq'  },
@@ -1143,14 +1143,16 @@ function onProviderChange() {
   $('btn-discover').style.display  = cfg.discover ? '' : 'none';
   $('ollama-status').style.display = 'none';
 
-  if (cfg.discover === 'ollama') discoverOllamaModels();
-  if (cfg.discover === 'groq')   discoverGroqModels();
+  if (cfg.discover === 'ollama')     discoverOllamaModels();
+  if (cfg.discover === 'groq')       discoverGroqModels();
+  if (cfg.discover === 'anthropic')  discoverAnthropicModels();
 }
 
 function discoverModels() {
   const p = $('f-ai-provider').value;
-  if (p === 'ollama') discoverOllamaModels();
-  if (p === 'groq')   discoverGroqModels();
+  if (p === 'ollama')    discoverOllamaModels();
+  if (p === 'groq')      discoverGroqModels();
+  if (p === 'anthropic') discoverAnthropicModels();
 }
 
 async function discoverGroqModels() {
@@ -1179,6 +1181,37 @@ async function discoverGroqModels() {
   } catch(e) {
     showModelInput();
     $('f-ai-model').placeholder = 'llama-3.1-8b-instant';
+    status.textContent = `❌ ${e.message}`;
+    status.style.color = 'var(--crimson)';
+  }
+}
+
+async function discoverAnthropicModels() {
+  const apiKey = $('f-ai-key').value.trim();
+  const status = $('ollama-status');
+  status.style.display = 'block';
+  status.style.color   = 'var(--text-secondary)';
+  status.textContent   = 'Fetching Anthropic models...';
+
+  try {
+    const url = apiKey
+      ? `${API}/api/ai/anthropic-models?api_key=${encodeURIComponent(apiKey)}`
+      : `${API}/api/ai/anthropic-models`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed');
+
+    if (data.models.length > 0) {
+      showModelSelect(data.models);
+      status.textContent = `✅ ${data.models.length} Anthropic model(s) — pick one from the dropdown`;
+      status.style.color = 'var(--mint)';
+    } else {
+      status.textContent = '⚠️ No Anthropic models found.';
+      status.style.color = 'var(--amber)';
+    }
+  } catch(e) {
+    showModelInput();
+    $('f-ai-model').placeholder = 'claude-3-5-sonnet-20241022';
     status.textContent = `❌ ${e.message}`;
     status.style.color = 'var(--crimson)';
   }
