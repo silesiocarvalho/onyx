@@ -49,11 +49,19 @@ cd onyx
 uv sync
 ```
 
-### 3. Install Playwright browser (for evidence capture)
+### 3. (Optional) Install Playwright browser — for PAN-OS evidence capture only
 
 ```bash
 uv run playwright install chromium
 ```
+
+> **WSL users:** if you get `Exec format error`, install system Node.js first:
+> ```bash
+> curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+> sudo apt-get install -y nodejs
+> uv run playwright install chromium
+> ```
+> You can skip this step entirely — evidence capture is optional. All audit, AI, and export features work without it.
 
 ### 4. Start the server
 
