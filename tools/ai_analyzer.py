@@ -343,7 +343,10 @@ Return format:
 }}
 """
         result = _call_ai(cfg, prompt, max_tokens=enrich_max_tokens)
-        enriched_map.update(result)
+        if isinstance(result, dict):
+            enriched_map.update(result)
+        else:
+            print(f"  [AI]   Batch {batch_num} returned unexpected type {type(result).__name__} — skipping", file=sys.stderr)
 
     enriched = []
     for f in actionable:
@@ -426,7 +429,10 @@ Return a JSON object keyed by control_id:
 """
         try:
             result = _call_ai(cfg, prompt, max_tokens=limits["max_enrich_tokens"])
-            impact_map.update(result)
+            if isinstance(result, dict):
+                impact_map.update(result)
+            else:
+                print(f"  [AI]   Impact batch {batch_num} returned unexpected type {type(result).__name__} — skipping", file=sys.stderr)
         except Exception as e:
             print(f"  [AI]   Impact batch {batch_num} failed (non-fatal): {e}", flush=True)
 
