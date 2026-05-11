@@ -1,0 +1,31 @@
+[project]
+name = "sariel"
+version = "1.0.0"
+description = "Sariel — Multi-Vendor Firewall Security Assessment Platform"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    "cryptography>=42.0.0",
+    "python-multipart>=0.0.9",
+    "anthropic>=0.28.0",
+    "paramiko>=3.4.0",
+    "openpyxl>=3.1.0",
+    "reportlab>=4.1.0",
+    "requests>=2.33.1",
+    "cp-mgmt-api-sdk>=1.9.0",
+    "python-docx>=1.2.0",
+    "litellm>=1.83.14",
+    "playwright>=1.59.0",
+]
+
+# No console_scripts here — use 'uv run uvicorn backend.main:app' directly (see start.sh)
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "httpx>=0.27.0",
+    "pytest-asyncio>=0.23.0",
+    "anyio>=4.0.0",
+]

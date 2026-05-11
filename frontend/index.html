@@ -1,0 +1,1999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sariel — Firewall Security Assessment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════
+   DESIGN SYSTEM — Industrial Security Terminal Aesthetic
+   Dark navy + electric mint + amber + crimson
+   ═══════════════════════════════════════════════════════ */
+:root {
+  --bg-base:     #080C14;
+  --bg-surface:  #0D1320;
+  --bg-card:     #111827;
+  --bg-elevated: #1A2236;
+  --bg-input:    #0A1020;
+
+  --border:      #1E2D45;
+  --border-mid:  #253550;
+  --border-hi:   #2E4170;
+
+  --mint:        #00FFB0;
+  --mint-dim:    #00CC8A;
+  --mint-glow:   rgba(0,255,176,0.12);
+  --amber:       #FFB84D;
+  --amber-dim:   #CC9033;
+  --amber-glow:  rgba(255,184,77,0.10);
+  --crimson:     #FF3D5A;
+  --crimson-dim: #CC2E46;
+  --crimson-glow:rgba(255,61,90,0.12);
+  --purple:      #BD83FF;
+  --sky:         #5BB8FF;
+
+  --text-primary:   #E8EDF5;
+  --text-secondary: #7A90B0;
+  --text-muted:     #3D5070;
+  --text-code:      #A8C4E0;
+
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: 'IBM Plex Sans', sans-serif;
+
+  --radius-sm: 4px;
+  --radius:    8px;
+  --radius-lg: 12px;
+
+  --transition: 160ms ease;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+
+/* ── Layout ── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── Header ── */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 32px; height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  position: sticky; top: 0; z-index: 100;
+}
+.header-logo {
+  display: flex; align-items: center; gap: 12px;
+}
+.logo-mark {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--mint), var(--sky));
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-weight: 600; font-size: 14px;
+  color: var(--bg-base); flex-shrink: 0;
+}
+.logo-text { font-family: var(--font-mono); font-size: 13px; color: var(--text-secondary); }
+.logo-text strong { color: var(--text-primary); font-weight: 600; }
+.session-badge {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  background: var(--bg-card); border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: var(--radius-sm);
+}
+
+/* ── Phase stepper ── */
+.stepper {
+  display: flex; align-items: center; gap: 0;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+}
+.step {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px; cursor: default;
+  position: relative; color: var(--text-muted);
+  font-size: 12px; font-weight: 500; letter-spacing: 0.04em;
+  text-transform: uppercase; transition: color var(--transition);
+  user-select: none;
+}
+.step::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: transparent; transition: background var(--transition);
+}
+.step.active { color: var(--mint); }
+.step.active::after { background: var(--mint); }
+.step.done { color: var(--text-secondary); cursor: pointer; }
+.step.done:hover { color: var(--text-primary); }
+.step-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1.5px solid currentColor;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 11px; flex-shrink: 0;
+}
+.step.active .step-num { background: var(--mint); border-color: var(--mint); color: var(--bg-base); }
+.step.done .step-num { background: var(--bg-elevated); }
+.step-sep { color: var(--text-muted); padding: 0 4px; font-size: 10px; }
+
+/* ── Main content ── */
+.main { flex: 1; padding: 32px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+/* ── Phase panels ── */
+.phase { display: none; }
+.phase.active { display: block; animation: fadeIn 240ms ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ── Section headings ── */
+.section-title {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 20px;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-title::before {
+  content: ''; display: block; width: 3px; height: 16px;
+  background: var(--mint); border-radius: 2px;
+}
+.page-title {
+  font-family: var(--font-mono); font-size: 22px; font-weight: 600;
+  color: var(--text-primary); margin-bottom: 6px;
+}
+.page-sub { color: var(--text-secondary); font-size: 13px; margin-bottom: 32px; }
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 24px;
+  transition: border-color var(--transition);
+}
+.card + .card { margin-top: 16px; }
+
+/* ── Form elements ── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.form-full { grid-column: 1 / -1; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.field label span { color: var(--crimson); margin-left: 2px; }
+.field input, .field select, .field textarea {
+  background: var(--bg-input); border: 1px solid var(--border-mid);
+  border-radius: var(--radius); padding: 10px 14px;
+  color: var(--text-primary); font-family: var(--font-mono); font-size: 13px;
+  outline: none; transition: border-color var(--transition), box-shadow var(--transition);
+  width: 100%;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--mint); box-shadow: 0 0 0 3px var(--mint-glow);
+}
+.field input::placeholder { color: var(--text-muted); }
+.field select option { background: var(--bg-card); }
+.field textarea { resize: vertical; min-height: 70px; font-size: 12px; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 20px; border-radius: var(--radius);
+  font-family: var(--font-mono); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all var(--transition);
+  border: 1px solid transparent; letter-spacing: 0.02em;
+  white-space: nowrap; outline: none;
+}
+.btn:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+.btn-primary {
+  background: var(--mint); color: var(--bg-base); border-color: var(--mint);
+}
+.btn-primary:hover { background: var(--mint-dim); border-color: var(--mint-dim); }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-outline {
+  background: transparent; color: var(--text-secondary);
+  border-color: var(--border-mid);
+}
+.btn-outline:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+.btn-danger {
+  background: var(--crimson-glow); color: var(--crimson); border-color: var(--crimson);
+}
+.btn-danger:hover { background: var(--crimson); color: white; }
+.btn-amber {
+  background: var(--amber-glow); color: var(--amber); border-color: var(--amber);
+}
+.btn-amber:hover { background: var(--amber); color: var(--bg-base); }
+.btn-sm { padding: 6px 12px; font-size: 11px; }
+.btn-lg { padding: 13px 28px; font-size: 14px; }
+
+/* ── Status badges ── */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.badge-pass    { background: rgba(0,255,176,0.12); color: var(--mint); border: 1px solid rgba(0,255,176,0.25); }
+.badge-fail    { background: rgba(255,61,90,0.12);  color: var(--crimson); border: 1px solid rgba(255,61,90,0.25); }
+.badge-manual  { background: rgba(255,184,77,0.12); color: var(--amber); border: 1px solid rgba(255,184,77,0.25); }
+.badge-skip    { background: rgba(122,144,176,0.10); color: var(--text-secondary); border: 1px solid var(--border); }
+.badge-pending { background: rgba(91,184,255,0.10); color: var(--sky); border: 1px solid rgba(91,184,255,0.25); }
+.badge-critical{ background: rgba(189,131,255,0.12); color: var(--purple); border: 1px solid rgba(189,131,255,0.25); }
+.badge-high    { background: rgba(255,61,90,0.12);  color: var(--crimson); border: 1px solid rgba(255,61,90,0.25); }
+.badge-medium  { background: rgba(255,184,77,0.12); color: var(--amber); border: 1px solid rgba(255,184,77,0.25); }
+.badge-low     { background: rgba(0,255,176,0.12); color: var(--mint); border: 1px solid rgba(0,255,176,0.25); }
+.badge-na      { background: rgba(122,144,176,0.10); color: var(--text-muted); border: 1px solid var(--border); }
+
+/* ── Stats row ── */
+.stats-row {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; text-align: center;
+}
+.stat-value { font-family: var(--font-mono); font-size: 28px; font-weight: 600; line-height: 1; margin-bottom: 4px; }
+.stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.stat-pass .stat-value    { color: var(--mint); }
+.stat-fail .stat-value    { color: var(--crimson); }
+.stat-manual .stat-value  { color: var(--amber); }
+.stat-skip .stat-value    { color: var(--text-secondary); }
+.stat-score .stat-value   { color: var(--sky); font-size: 34px; }
+
+/* ── Progress bar ── */
+.progress-wrap { margin-bottom: 16px; }
+.progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.progress-label { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+.progress-pct   { font-family: var(--font-mono); font-size: 12px; color: var(--mint); }
+.progress-bar   { height: 4px; background: var(--bg-elevated); border-radius: 2px; overflow: hidden; }
+.progress-fill  {
+  height: 100%; background: linear-gradient(90deg, var(--mint), var(--sky));
+  border-radius: 2px; transition: width 400ms ease;
+  box-shadow: 0 0 8px var(--mint-glow);
+}
+
+/* ── Terminal log ── */
+.terminal {
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.8;
+  height: 320px; overflow-y: auto; color: var(--text-code);
+}
+.terminal-line { display: flex; gap: 10px; }
+.terminal-ts   { color: var(--text-muted); flex-shrink: 0; }
+.terminal-msg.pass   { color: var(--mint); }
+.terminal-msg.fail   { color: var(--crimson); }
+.terminal-msg.warn   { color: var(--amber); }
+.terminal-msg.phase  { color: var(--sky); font-weight: 600; }
+.terminal-msg.error  { color: var(--crimson); font-weight: 600; }
+.terminal-msg.info   { color: var(--text-code); }
+.terminal-cursor { display: inline-block; width: 7px; height: 13px; background: var(--mint); animation: blink 1s step-end infinite; vertical-align: text-bottom; margin-left: 2px; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── Previous sessions list ── */
+.prev-session-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.prev-session-row:last-child { border-bottom: none; }
+.prev-session-meta { flex: 1; min-width: 0; }
+.prev-session-org  { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prev-session-sub  { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+.prev-session-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* ── Manual workbench ── */
+.workbench-filters {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;
+  align-items: center;
+}
+.filter-btn {
+  padding: 5px 12px; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 11px; cursor: pointer;
+  background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.filter-btn.active { border-color: var(--mint); color: var(--mint); background: var(--mint-glow); }
+.filter-btn:hover  { border-color: var(--border-hi); color: var(--text-primary); }
+
+.check-item {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 10px;
+  transition: border-color var(--transition);
+  overflow: hidden;
+}
+.check-item.is-complete { border-color: var(--border-mid); }
+.check-item.is-complete.pass-complete { border-left: 3px solid var(--mint); }
+.check-item.is-complete.fail-complete { border-left: 3px solid var(--crimson); }
+.check-item.is-complete.na-complete   { border-left: 3px solid var(--text-muted); }
+.check-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; cursor: pointer;
+  transition: background var(--transition);
+}
+.check-header:hover { background: var(--bg-elevated); }
+.check-cid {
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  color: var(--sky); width: 48px; flex-shrink: 0;
+}
+.check-desc { flex: 1; font-size: 13px; color: var(--text-primary); }
+.check-risk { flex-shrink: 0; }
+.check-chevron {
+  color: var(--text-muted); font-size: 10px; flex-shrink: 0;
+  transition: transform var(--transition);
+}
+.check-item.expanded .check-chevron { transform: rotate(90deg); }
+
+.check-body {
+  display: none; padding: 0 16px 16px; border-top: 1px solid var(--border);
+}
+.check-item.expanded .check-body { display: block; }
+
+.guidance-box {
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 14px; margin-bottom: 14px;
+}
+.guidance-where {
+  font-family: var(--font-mono); font-size: 11px; color: var(--sky);
+  margin-bottom: 8px; font-weight: 500;
+}
+.guidance-steps { list-style: none; }
+.guidance-steps li {
+  font-size: 12px; color: var(--text-secondary); padding: 3px 0;
+  display: flex; gap: 8px;
+}
+.guidance-steps li::before {
+  content: '→'; color: var(--text-muted); flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+.guidance-criteria {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;
+}
+.criteria-pass, .criteria-fail {
+  font-size: 11px; padding: 8px 10px; border-radius: var(--radius-sm);
+}
+.criteria-pass {
+  background: rgba(0,255,176,0.06); border: 1px solid rgba(0,255,176,0.15);
+  color: var(--mint);
+}
+.criteria-fail {
+  background: rgba(255,61,90,0.06); border: 1px solid rgba(255,61,90,0.15);
+  color: var(--crimson);
+}
+.criteria-label {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;
+}
+
+.verdict-row {
+  display: flex; gap: 10px; margin-bottom: 12px; margin-top: 14px;
+}
+.verdict-btn {
+  flex: 1; padding: 9px; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  cursor: pointer; border: 2px solid transparent; transition: all var(--transition);
+  text-align: center; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.verdict-btn[data-v="PASS"] {
+  background: rgba(0,255,176,0.06); border-color: rgba(0,255,176,0.3); color: var(--mint);
+}
+.verdict-btn[data-v="PASS"].selected, .verdict-btn[data-v="PASS"]:hover {
+  background: var(--mint); color: var(--bg-base); border-color: var(--mint);
+}
+.verdict-btn[data-v="FAIL"] {
+  background: rgba(255,61,90,0.06); border-color: rgba(255,61,90,0.3); color: var(--crimson);
+}
+.verdict-btn[data-v="FAIL"].selected, .verdict-btn[data-v="FAIL"]:hover {
+  background: var(--crimson); color: white; border-color: var(--crimson);
+}
+.verdict-btn[data-v="NA"] {
+  background: rgba(122,144,176,0.06); border-color: var(--border); color: var(--text-secondary);
+}
+.verdict-btn[data-v="NA"].selected, .verdict-btn[data-v="NA"]:hover {
+  background: var(--bg-elevated); color: var(--text-primary); border-color: var(--border-hi);
+}
+
+/* ── Framework checkboxes ── */
+.framework-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+}
+.framework-check { cursor: pointer; }
+.framework-check input[type="checkbox"] { display: none; }
+.fw-box {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 8px; border-radius: var(--radius);
+  border: 1.5px solid var(--border-mid);
+  background: var(--bg-input);
+  transition: all var(--transition);
+}
+.framework-check input:checked + .fw-box {
+  border-color: var(--mint); background: var(--mint-glow);
+}
+.fw-abbr { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.fw-name { font-size: 11px; color: var(--text-secondary); }
+
+/* ── Compliance tags ── */
+.compliance-tags {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;
+}
+.compliance-tag {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+  padding: 2px 6px; border-radius: 3px;
+  border: 1px solid; letter-spacing: 0.02em;
+}
+.ctag-nist    { color: #5BB8FF; border-color: rgba(91,184,255,0.3); background: rgba(91,184,255,0.06); }
+.ctag-iso     { color: #00FFB0; border-color: rgba(0,255,176,0.3);  background: rgba(0,255,176,0.06); }
+.ctag-pci     { color: #BD83FF; border-color: rgba(189,131,255,0.3);background: rgba(189,131,255,0.06); }
+.ctag-mitre   { color: #FF3D5A; border-color: rgba(255,61,90,0.3);  background: rgba(255,61,90,0.06); }
+.ctag-gdpr    { color: #FF9F43; border-color: rgba(255,159,67,0.3); background: rgba(255,159,67,0.06); }
+.ctag-hipaa   { color: #00D2D3; border-color: rgba(0,210,211,0.3);  background: rgba(0,210,211,0.06); }
+.ctag-soc2    { color: #FFC312; border-color: rgba(255,195,18,0.3); background: rgba(255,195,18,0.06); }
+
+/* ── Attack chains ── */
+.chain-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px; margin-bottom: 12px;
+  border-left: 3px solid var(--purple);
+}
+.chain-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.chain-title { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.chain-body { font-size: 12px; color: var(--text-secondary); line-height: 1.7; }
+.chain-controls {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;
+}
+.control-pill {
+  font-family: var(--font-mono); font-size: 10px; padding: 2px 8px;
+  background: var(--bg-elevated); border: 1px solid var(--border-mid);
+  border-radius: 12px; color: var(--sky);
+}
+.chain-fix {
+  margin-top: 10px; font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-muted);
+}
+.chain-fix strong { color: var(--amber); }
+
+/* ── Export panel ── */
+.export-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.export-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px; text-align: center;
+  transition: border-color var(--transition), transform var(--transition);
+}
+.export-card:hover { border-color: var(--border-hi); transform: translateY(-2px); }
+.export-icon { font-size: 32px; margin-bottom: 12px; display: block; }
+.export-label { font-family: var(--font-mono); font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.export-desc  { font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5; }
+
+/* ── Risk rating chip ── */
+.risk-chip {
+  display: inline-block; padding: 6px 14px; border-radius: var(--radius);
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.risk-critical { background: rgba(189,131,255,0.15); color: var(--purple); border: 1px solid rgba(189,131,255,0.3); }
+.risk-high     { background: rgba(255,61,90,0.12);  color: var(--crimson); border: 1px solid rgba(255,61,90,0.3); }
+.risk-medium   { background: rgba(255,184,77,0.12); color: var(--amber);   border: 1px solid rgba(255,184,77,0.3); }
+.risk-low      { background: rgba(0,255,176,0.10); color: var(--mint);    border: 1px solid rgba(0,255,176,0.25); }
+
+/* ── Completion gate ── */
+.gate-bar {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 20px;
+  display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
+}
+.gate-icon { font-size: 20px; flex-shrink: 0; }
+.gate-text { flex: 1; }
+.gate-title { font-weight: 500; color: var(--text-primary); font-size: 13px; }
+.gate-sub   { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+/* ── Divider ── */
+.divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+/* ── Two-col layout ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+/* ── Narrative card ── */
+.narrative-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+}
+.narrative-label {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 10px;
+}
+.narrative-headline {
+  font-size: 15px; font-weight: 500; color: var(--text-primary);
+  font-style: italic; margin-bottom: 12px; line-height: 1.5;
+}
+.narrative-body { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+.narrative-body + .narrative-body { margin-top: 10px; }
+
+/* ── Alert ── */
+.alert {
+  padding: 12px 16px; border-radius: var(--radius);
+  font-size: 13px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px;
+}
+.alert-error   { background: var(--crimson-glow); border: 1px solid var(--crimson); color: var(--crimson); }
+.alert-warning { background: var(--amber-glow);   border: 1px solid var(--amber-dim); color: var(--amber); }
+.alert-success { background: var(--mint-glow);    border: 1px solid var(--mint-dim); color: var(--mint); }
+
+/* ═══════════════════════════════════
+   LOADING OVERLAY
+   ═══════════════════════════════════ */
+.overlay {
+  position: fixed; inset: 0; z-index: 999;
+  background: rgba(8,12,20,0.85); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 300ms;
+}
+.overlay.visible { opacity: 1; pointer-events: all; }
+.spinner-box { text-align: center; }
+.spinner {
+  width: 40px; height: 40px; margin: 0 auto 16px;
+  border: 2px solid var(--border-hi);
+  border-top-color: var(--mint);
+  border-radius: 50%; animation: spin 700ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner-label { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ═══ HEADER ════════════════════════════════════════ -->
+  <header class="header">
+    <div class="header-logo">
+      <div class="logo-mark">Sariel</div>
+      <div class="logo-text"><strong>Sariel</strong> &nbsp;·&nbsp; Firewall Security Assessment</div>
+    </div>
+    <div id="session-badge" class="session-badge" style="display:none">SESSION: <span id="session-id-display">—</span></div>
+  </header>
+
+  <!-- ═══ PHASE STEPPER ════════════════════════════════ -->
+  <nav class="stepper">
+    <div class="step active" id="step-1" onclick="goToPhase(1)">
+      <div class="step-num">1</div> Client Setup
+    </div>
+    <div class="step-sep">›</div>
+    <div class="step" id="step-2" onclick="goToPhase(2)">
+      <div class="step-num">2</div> Automated Audit
+    </div>
+    <div class="step-sep">›</div>
+    <div class="step" id="step-3" onclick="goToPhase(3)">
+      <div class="step-num">3</div> Manual Review
+    </div>
+    <div class="step-sep">›</div>
+    <div class="step" id="step-4" onclick="goToPhase(4)">
+      <div class="step-num">4</div> Export Report
+    </div>
+  </nav>
+
+  <!-- ═══ MAIN ══════════════════════════════════════════ -->
+  <main class="main">
+
+    <!-- Error banner -->
+    <div id="global-error" class="alert alert-error" style="display:none">
+      <span>⚠</span> <span id="global-error-msg"></span>
+    </div>
+
+    <!-- ══════════════════════════════════
+         PHASE 1 — CLIENT SETUP
+    ══════════════════════════════════ -->
+    <div class="phase active" id="phase-1">
+      <div class="page-title">New Assessment</div>
+      <p class="page-sub">Enter client device credentials and assessment context. Credentials are encrypted immediately and never transmitted to the AI model.</p>
+
+      <div class="card">
+        <div class="section-title">Firewall Access</div>
+        <div class="form-grid">
+          <div class="field" style="grid-column:1/-1">
+            <label>Firewall Vendor <span>*</span></label>
+            <select id="f-vendor" onchange="onVendorChange()">
+              <option value="checkpoint">Check Point Gaia R82</option>
+              <option value="palo_alto">Palo Alto Networks PAN-OS</option>
+              <option value="fortios" disabled>Fortinet FortiGate (coming soon)</option>
+              <option value="cisco_fmc" disabled>Cisco Firepower (coming soon)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>IP Address <span>*</span></label>
+            <input id="f-ip" type="text" placeholder="192.168.1.1" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>Username <span>*</span></label>
+            <input id="f-user" type="text" placeholder="admin" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>Password <span>*</span></label>
+            <input id="f-pass" type="password" placeholder="••••••••" autocomplete="new-password">
+          </div>
+          <div class="field" id="field-mgmt-apikey">
+            <label id="label-mgmt-apikey">SmartConsole API Key <span style="color:var(--text-muted);font-size:10px">(optional — for §3 checks)</span></label>
+            <input id="f-apikey" type="password" placeholder="Leave blank to use username/password" autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="section-title">Assessment Context</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Organization Name <span>*</span></label>
+            <input id="f-org" type="text" placeholder="Acme Financial Services">
+          </div>
+          <div class="field">
+            <label>Assessor Name</label>
+            <input id="f-assessor" type="text" placeholder="Your name">
+          </div>
+          <div class="field">
+            <label>Device Role</label>
+            <select id="f-role">
+              <option value="Perimeter Firewall">Perimeter Firewall</option>
+              <option value="DMZ Gateway">DMZ Gateway</option>
+              <option value="Internal Segment Firewall">Internal Segment Firewall</option>
+              <option value="Core Firewall">Core Firewall</option>
+              <option value="Branch Office Firewall">Branch Office Firewall</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Industry</label>
+            <select id="f-industry">
+              <option value="General">General</option>
+              <option value="Finance">Finance / Banking</option>
+              <option value="Healthcare">Healthcare</option>
+              <option value="Retail">Retail</option>
+              <option value="Energy">Energy / Utilities</option>
+              <option value="Government">Government</option>
+              <option value="Technology">Technology</option>
+              <option value="Manufacturing">Manufacturing</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Security Compliance -->
+      <div class="card" style="margin-top:16px">
+        <div class="section-title">Security Compliance</div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">
+          Select frameworks to include compliance control mappings in all exported reports.
+        </p>
+        <div class="framework-grid">
+          <label class="framework-check">
+            <input type="checkbox" id="fw-nist_csf" value="nist_csf">
+            <span class="fw-box">
+              <span class="fw-abbr" style="color:#5BB8FF">NIST</span>
+              <span class="fw-name">CSF 2.0</span>
+            </span>
+          </label>
+          <label class="framework-check">
+            <input type="checkbox" id="fw-iso_27001" value="iso_27001">
+            <span class="fw-box">
+              <span class="fw-abbr" style="color:#00FFB0">ISO</span>
+              <span class="fw-name">27001:2022</span>
+            </span>
+          </label>
+          <label class="framework-check">
+            <input type="checkbox" id="fw-pci_dss" value="pci_dss">
+            <span class="fw-box">
+              <span class="fw-abbr" style="color:#BD83FF">PCI</span>
+              <span class="fw-name">DSS v4.0.1</span>
+            </span>
+          </label>
+          <label class="framework-check">
+            <input type="checkbox" id="fw-mitre_attack" value="mitre_attack">
+            <span class="fw-box">
+              <span class="fw-abbr" style="color:#FF3D5A">ATT&CK</span>
+              <span class="fw-name">MITRE v15</span>
+            </span>
+          </label>
+          <label class="framework-check">
+            <input type="checkbox" id="fw-gdpr" value="gdpr">
+            <span class="fw-box">
+              <span class="fw-abbr" style="color:#FF9F43">GDPR</span>
+              <span class="fw-name">Art. 32</span>
+            </span>
+          </label>
+          <label class="framework-check">
+            <input type="checkbox" id="fw-hipaa" value="hipaa">
+            <span class="fw-box">
+              <span class="fw-abbr" style="color:#00D2D3">HIPAA</span>
+              <span class="fw-name">§164.312</span>
+            </span>
+          </label>
+          <label class="framework-check">
+            <input type="checkbox" id="fw-soc2" value="soc2">
+            <span class="fw-box">
+              <span class="fw-abbr" style="color:#FFC312">SOC2</span>
+              <span class="fw-name">TSC 2017</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- AI Provider Configuration -->
+      <div class="card" style="margin-top:20px">
+        <div class="section-title">AI Analysis Configuration</div>
+        <div class="form-grid">
+          <div class="field">
+            <label>AI Provider</label>
+            <select id="f-ai-provider" onchange="onProviderChange()">
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (GPT)</option>
+              <option value="ollama">Ollama (local)</option>
+              <option value="groq">Groq</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="custom">Custom / Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>AI Model</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="f-ai-model" type="text" placeholder="claude-sonnet-4-6"
+                     value="claude-sonnet-4-6" style="flex:1">
+              <select id="f-ai-model-select" style="flex:1;display:none"></select>
+              <button id="btn-discover" type="button" onclick="discoverModels()"
+                      style="display:none;white-space:nowrap" class="btn btn-secondary btn-sm">
+                Discover ↺
+              </button>
+            </div>
+            <span id="ai-model-hint" style="font-size:11px;color:var(--muted);margin-top:3px;display:block">
+              claude-sonnet-4-6 · claude-haiku-4-5
+            </span>
+          </div>
+          <div class="field" id="field-ai-key">
+            <label>AI API Key <span style="color:var(--crimson)">*</span></label>
+            <input id="f-ai-key" type="password" placeholder="Required — sk-ant-... / gsk_... / sk-...">
+          </div>
+          <div class="field" id="field-ai-url" style="display:none">
+            <label>Ollama Base URL</label>
+            <input id="f-ai-url" type="text" value="http://localhost:11434"
+                   placeholder="http://localhost:11434" onblur="discoverOllamaModels()">
+          </div>
+        </div>
+        <div id="ollama-status" style="margin-top:8px;font-size:12px;color:var(--muted);display:none"></div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:24px">
+        <button class="btn btn-primary btn-lg" onclick="startSession()">
+          Start Assessment →
+        </button>
+      </div>
+
+      <!-- Previous assessments -->
+      <div id="prev-sessions-card" class="card" style="margin-top:28px;display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="section-title" style="margin-bottom:0">Previous Assessments</div>
+          <button class="btn btn-sm btn-outline" style="color:var(--red)" onclick="deleteAllSessions(this)">Delete All</button>
+        </div>
+        <div id="prev-sessions-list"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         PHASE 2 — AUTOMATED AUDIT
+    ══════════════════════════════════ -->
+    <div class="phase" id="phase-2">
+      <div class="page-title">Automated Audit</div>
+      <p class="page-sub" id="phase2-sub">Connecting to device and running security checks...</p>
+
+      <div class="progress-wrap">
+        <div class="progress-header">
+          <span class="progress-label" id="progress-label">Initializing...</span>
+          <span class="progress-pct" id="progress-pct">0%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      </div>
+
+      <div class="stats-row" id="live-stats" style="display:none">
+        <div class="stat-card stat-pass">
+          <div class="stat-value" id="s-pass">0</div>
+          <div class="stat-label">Pass</div>
+        </div>
+        <div class="stat-card stat-fail">
+          <div class="stat-value" id="s-fail">0</div>
+          <div class="stat-label">Fail</div>
+        </div>
+        <div class="stat-card stat-manual">
+          <div class="stat-value" id="s-manual">0</div>
+          <div class="stat-label">Manual</div>
+        </div>
+        <div class="stat-card stat-skip">
+          <div class="stat-value" id="s-skip">0</div>
+          <div class="stat-label">Skipped</div>
+        </div>
+        <div class="stat-card stat-score">
+          <div class="stat-value" id="s-score">—</div>
+          <div class="stat-label">Score</div>
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top:4px">Live Audit Log</div>
+      <div class="terminal" id="terminal">
+        <div class="terminal-line">
+          <span class="terminal-ts">00:00:00</span>
+          <span class="terminal-msg phase">Waiting for audit to begin...</span>
+          <span class="terminal-cursor"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         PHASE 3 — MANUAL REVIEW
+    ══════════════════════════════════ -->
+    <div class="phase" id="phase-3">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div class="page-title">Manual Review</div>
+        <div id="manual-score-chip" style="font-family:var(--font-mono);font-size:13px;color:var(--text-secondary)"></div>
+      </div>
+      <p class="page-sub">Complete the checks that require SmartConsole or expert mode access. Resolve all items to enable finalization.</p>
+
+      <!-- Completion gate -->
+      <div class="gate-bar" id="gate-bar">
+        <div class="gate-icon" id="gate-icon">🔒</div>
+        <div class="gate-text">
+          <div class="gate-title" id="gate-title">Complete all manual checks to finalize the report</div>
+          <div class="gate-sub" id="gate-sub">0 of 0 checks resolved</div>
+        </div>
+        <div id="gate-progress" style="width:200px">
+          <div class="progress-bar"><div class="progress-fill" id="gate-fill" style="width:0%"></div></div>
+        </div>
+        <button class="btn btn-primary" id="btn-finalize" disabled onclick="finalizeReport()">
+          Finalize Report →
+        </button>
+      </div>
+
+      <!-- Summary stats -->
+      <div class="stats-row" id="manual-stats" style="margin-bottom:24px">
+        <div class="stat-card stat-pass"><div class="stat-value" id="ms-pass">0</div><div class="stat-label">Pass</div></div>
+        <div class="stat-card stat-fail"><div class="stat-value" id="ms-fail">0</div><div class="stat-label">Fail</div></div>
+        <div class="stat-card stat-manual"><div class="stat-value" id="ms-manual">0</div><div class="stat-label">Pending</div></div>
+        <div class="stat-card stat-skip"><div class="stat-value" id="ms-skip">0</div><div class="stat-label">Skipped</div></div>
+        <div class="stat-card stat-score"><div class="stat-value" id="ms-score">—</div><div class="stat-label">Score</div></div>
+      </div>
+
+      <!-- AI Narrative preview -->
+      <div id="narrative-section" style="display:none">
+        <div class="section-title">AI Assessment Narrative</div>
+        <div class="two-col" style="margin-bottom:24px">
+          <div class="narrative-card">
+            <div class="narrative-label">Executive Summary</div>
+            <div class="narrative-headline" id="exec-headline"></div>
+            <div class="narrative-body" id="exec-para1"></div>
+          </div>
+          <div>
+            <div class="narrative-card" style="margin-bottom:12px">
+              <div class="narrative-label">Overall Risk Rating</div>
+              <div style="margin-top:8px" id="overall-risk-chip"></div>
+            </div>
+            <div id="attack-chains-mini"></div>
+          </div>
+        </div>
+        <div class="divider"></div>
+      </div>
+
+      <!-- Filter row -->
+      <div class="workbench-filters">
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-right:4px">Filter:</span>
+        <button class="filter-btn active" onclick="filterChecks('all', this)">All</button>
+        <button class="filter-btn" onclick="filterChecks('pending', this)">Pending</button>
+        <button class="filter-btn" onclick="filterChecks('PASS', this)">Pass</button>
+        <button class="filter-btn" onclick="filterChecks('FAIL', this)">Fail</button>
+        <button class="filter-btn" onclick="filterChecks('NA', this)">N/A</button>
+      </div>
+
+      <div id="workbench-list"></div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         PHASE 4 — EXPORT REPORT
+    ══════════════════════════════════ -->
+    <div class="phase" id="phase-4">
+      <div class="page-title">Export Report</div>
+      <p class="page-sub">Assessment complete. Download the final report in your preferred format.</p>
+
+      <div class="alert alert-success" id="finalize-success" style="display:none">
+        <span>✓</span> <span>Report finalized. All findings — automated and manual — are included.</span>
+      </div>
+
+      <!-- Final stats -->
+      <div class="stats-row" style="margin-bottom:24px">
+        <div class="stat-card stat-pass"><div class="stat-value" id="es-pass">0</div><div class="stat-label">Pass</div></div>
+        <div class="stat-card stat-fail"><div class="stat-value" id="es-fail">0</div><div class="stat-label">Fail</div></div>
+        <div class="stat-card stat-manual"><div class="stat-value" id="es-manual">0</div><div class="stat-label">Manual</div></div>
+        <div class="stat-card stat-skip"><div class="stat-value" id="es-skip">0</div><div class="stat-label">Skipped</div></div>
+        <div class="stat-card stat-score"><div class="stat-value" id="es-score">—</div><div class="stat-label">Final Score</div></div>
+      </div>
+
+      <!-- Headline + risk -->
+      <div class="two-col" style="margin-bottom:24px">
+        <div class="narrative-card">
+          <div class="narrative-label">Assessment Headline</div>
+          <div class="narrative-headline" id="final-headline">—</div>
+          <div class="narrative-body" id="final-para">—</div>
+        </div>
+        <div>
+          <div class="narrative-card" style="margin-bottom:12px">
+            <div class="narrative-label">Overall Risk Rating</div>
+            <div style="margin-top:8px" id="final-risk-chip">—</div>
+          </div>
+          <div class="narrative-card">
+            <div class="narrative-label">Assessment Context</div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);line-height:2" id="final-context">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Download</div>
+      <div class="export-grid">
+        <div class="export-card">
+          <span class="export-icon">📄</span>
+          <div class="export-label">PDF Report</div>
+          <div class="export-desc">Professional client deliverable with cover page, executive summary, attack chains, and full findings.</div>
+          <button class="btn btn-outline" onclick="exportReport('pdf')">Download PDF</button>
+        </div>
+        <div class="export-card">
+          <span class="export-icon">📊</span>
+          <div class="export-label">Excel Workbook</div>
+          <div class="export-desc">5-sheet workbook: Dashboard, All Findings, Attack Chains, Remediation Roadmap, Raw Data.</div>
+          <button class="btn btn-outline" onclick="exportReport('excel')">Download Excel</button>
+        </div>
+        <div class="export-card">
+          <span class="export-icon">🗃️</span>
+          <div class="export-label">CSV Data</div>
+          <div class="export-desc">Flat file export of all findings with AI fields. Import into GRC platforms or tracking sheets.</div>
+          <button class="btn btn-outline" onclick="exportReport('csv')">Download CSV</button>
+        </div>
+        <div class="export-card">
+          <span class="export-icon">📝</span>
+          <div class="export-label">Word Document</div>
+          <div class="export-desc">Editable .docx report with TOC, executive summary, attack chains, and full findings table.</div>
+          <button class="btn btn-outline" onclick="exportReport('docx')">Download Word</button>
+        </div>
+        <div class="export-card">
+          <span class="export-icon">📋</span>
+          <div class="export-label">Consulting Report</div>
+          <div class="export-desc">Client-facing advisory Word report: thematic findings, risk ratings, recommendations, and priority initiative plan.</div>
+          <button class="btn btn-outline" onclick="exportConsulting()">Download Consulting Report</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <p style="font-size:12px;color:var(--text-muted)">Start a new assessment for another client device</p>
+        <button class="btn btn-outline" onclick="newAssessment()">← New Assessment</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Loading overlay -->
+<div class="overlay" id="overlay">
+  <div class="spinner-box">
+    <div class="spinner"></div>
+    <div class="spinner-label" id="overlay-label">Processing...</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     APPLICATION JAVASCRIPT
+     ═══════════════════════════════════════════════════════ -->
+<script>
+// ── State ──────────────────────────────────────────────
+const state = {
+  sessionId:     null,
+  currentPhase:  1,
+  ws:            null,
+  liveCounts:    {PASS:0, FAIL:0, MANUAL:0, SKIPPED:0, ERROR:0},
+  workbenchItems: [],
+  currentFilter: 'all',
+  manualResults: {},   // control_id → {status, evidence, notes}
+  reportData:    null,
+  frameworks:    [],   // selected compliance frameworks for this session
+};
+
+// ── Compliance lookup (mirrors tools/compliance_mappings.py) ──────────────
+const COMPLIANCE_MAPS = {"1.1":{"nist_csf":["PR.AA-01","PR.AA-05"],"iso_27001":["A.5.17","A.8.5"],"pci_dss":["8.3.6"],"mitre_attack":["T1110","T1078"]},"1.2":{"nist_csf":["PR.AA-05"],"iso_27001":["A.5.17","A.8.5"],"pci_dss":["8.3.6"],"mitre_attack":["T1110"]},"1.3":{"nist_csf":["PR.AA-05"],"iso_27001":["A.5.17","A.8.5"],"pci_dss":["8.3.6"],"mitre_attack":["T1110"]},"1.4a":{"nist_csf":["PR.AA-05"],"iso_27001":["A.5.17"],"pci_dss":["8.3.7"],"mitre_attack":["T1110"]},"1.4b":{"nist_csf":["PR.AA-05"],"iso_27001":["A.5.17"],"pci_dss":["8.3.7"],"mitre_attack":["T1110"]},"1.5":{"nist_csf":["PR.AA-05"],"iso_27001":["A.5.17"],"pci_dss":["8.3.9"],"mitre_attack":["T1078","T1552"]},"1.6":{"nist_csf":["PR.AA-05"],"iso_27001":["A.5.17"],"pci_dss":["8.3.9"],"mitre_attack":["T1078"]},"1.7":{"nist_csf":["PR.AA-05"],"iso_27001":["A.5.18"],"pci_dss":["8.2.6"],"mitre_attack":["T1078"]},"1.8":{"nist_csf":["PR.AA-05"],"iso_27001":["A.5.18","A.8.2"],"pci_dss":["8.2.5"],"mitre_attack":["T1078","T1098"]},"1.9":{"nist_csf":["PR.AA-05"],"iso_27001":["A.5.18","A.8.2"],"pci_dss":["8.2.5"],"mitre_attack":["T1078"]},"1.10":{"nist_csf":["PR.AA-05"],"iso_27001":["A.5.17"],"pci_dss":["8.2.3"],"mitre_attack":["T1078","T1552"]},"1.11":{"nist_csf":["PR.AA-02","PR.AA-03"],"iso_27001":["A.8.5"],"pci_dss":["8.3.4"],"mitre_attack":["T1110"]},"1.12":{"nist_csf":["PR.AA-02","PR.AA-03"],"iso_27001":["A.8.5"],"pci_dss":["8.3.4"],"mitre_attack":["T1110"]},"1.13":{"nist_csf":["PR.AA-02","PR.AA-03"],"iso_27001":["A.8.5"],"pci_dss":["8.3.4"],"mitre_attack":["T1110"]},"2.1.1":{"nist_csf":["GV.PO-01"],"iso_27001":["A.5.1"],"pci_dss":["2.2.1"],"mitre_attack":["T1078"]},"2.1.2":{"nist_csf":["GV.PO-01"],"iso_27001":["A.5.1"],"pci_dss":["2.2.1"],"mitre_attack":[]},"2.1.3":{"nist_csf":["DE.CM-03","PR.PS-04"],"iso_27001":["A.8.15"],"pci_dss":["10.2.1"],"mitre_attack":["T1562"]},"2.1.4":{"nist_csf":["PR.PS-01"],"iso_27001":["A.8.9"],"pci_dss":["2.2.1"],"mitre_attack":["T1562.001"]},"2.1.5":{"nist_csf":["PR.PS-01","ID.AM-01"],"iso_27001":["A.8.20","A.8.22"],"pci_dss":["1.2.1"],"mitre_attack":["T1133","T1046"]},"2.1.6":{"nist_csf":["PR.PS-01"],"iso_27001":["A.8.20"],"pci_dss":["2.2.1"],"mitre_attack":["T1568"]},"2.1.7":{"nist_csf":["PR.PS-01","PR.IR-01"],"iso_27001":["A.8.20"],"pci_dss":["1.2.1"],"mitre_attack":["T1133","T1046"]},"2.1.8":{"nist_csf":["ID.AM-01","PR.PS-01"],"iso_27001":["A.8.9"],"pci_dss":["2.2.1"],"mitre_attack":[]},"2.1.9":{"nist_csf":["PR.PS-01","PR.IR-01"],"iso_27001":["A.8.20","A.8.21"],"pci_dss":["2.2.7","8.2.1"],"mitre_attack":["T1021","T1040","T1552"]},"2.1.10":{"nist_csf":["PR.PS-01","PR.IR-01"],"iso_27001":["A.8.20"],"pci_dss":["1.2.1"],"mitre_attack":["T1557"]},"2.2.1":{"nist_csf":["PR.PS-01","PR.AA-05"],"iso_27001":["A.8.20","A.8.21"],"pci_dss":["2.2.1","2.2.7"],"mitre_attack":["T1040","T1046","T1562"]},"2.2.2":{"nist_csf":["PR.PS-01","PR.DS-02"],"iso_27001":["A.8.20","A.8.21"],"pci_dss":["2.2.7"],"mitre_attack":["T1040","T1046"]},"2.2.3":{"nist_csf":["DE.CM-01"],"iso_27001":["A.8.16"],"pci_dss":["10.7"],"mitre_attack":["T1562"]},"2.2.4":{"nist_csf":["DE.CM-01"],"iso_27001":["A.8.16"],"pci_dss":["10.7"],"mitre_attack":["T1562"]},"2.3.1":{"nist_csf":["PR.PS-01"],"iso_27001":["A.8.17"],"pci_dss":["10.6.1"],"mitre_attack":["T1070"]},"2.3.2":{"nist_csf":["PR.PS-01"],"iso_27001":["A.8.17"],"pci_dss":["10.6.2"],"mitre_attack":["T1070"]},"2.4.1":{"nist_csf":["PR.DS-11","PR.IR-04","RC.RP-01"],"iso_27001":["A.8.13"],"pci_dss":["12.3.4"],"mitre_attack":["T1490"]},"2.4.3":{"nist_csf":["PR.DS-11","PR.IR-04","RC.RP-01"],"iso_27001":["A.8.13"],"pci_dss":["12.3.4"],"mitre_attack":["T1490"]},"2.5.1":{"nist_csf":["PR.AA-05"],"iso_27001":["A.8.3"],"pci_dss":["8.2.8"],"mitre_attack":["T1078"]},"2.5.2":{"nist_csf":["PR.AA-05"],"iso_27001":["A.8.3"],"pci_dss":["8.2.8"],"mitre_attack":["T1078"]},"2.5.3":{"nist_csf":["PR.DS-02"],"iso_27001":["A.8.24"],"pci_dss":["4.2.1"],"mitre_attack":["T1040","T1557"]},"2.5.4":{"nist_csf":["PR.AA-02","PR.AA-05"],"iso_27001":["A.5.16","A.8.5"],"pci_dss":["8.6.1"],"mitre_attack":["T1078","T1110"]},"2.5.5":{"nist_csf":["PR.AA-05","PR.IR-01"],"iso_27001":["A.5.15","A.8.3"],"pci_dss":["1.3.1","7.2.1"],"mitre_attack":["T1133","T1021"]},"2.6.1":{"nist_csf":["DE.CM-01","PR.PS-04"],"iso_27001":["A.8.15"],"pci_dss":["10.2.1"],"mitre_attack":["T1070","T1562"]},"2.6.2":{"nist_csf":["DE.CM-01","DE.AE-02"],"iso_27001":["A.8.15"],"pci_dss":["10.3.3"],"mitre_attack":["T1070"]},"2.6.3":{"nist_csf":["DE.CM-01","PR.PS-04"],"iso_27001":["A.8.15"],"pci_dss":["10.2.1"],"mitre_attack":["T1070","T1562"]},"3.1":{"nist_csf":["PR.PS-05","PR.IR-01"],"iso_27001":["A.8.20","A.8.22"],"pci_dss":["1.3.1","1.3.2"],"mitre_attack":["T1133","T1190"]},"3.2":{"nist_csf":["PR.PS-05","PR.IR-01"],"iso_27001":["A.8.20"],"pci_dss":["1.3.1","1.3.2"],"mitre_attack":["T1133","T1190"]},"3.3":{"nist_csf":["GV.PO-01","PR.PS-01"],"iso_27001":["A.5.37"],"pci_dss":["1.2.1"],"mitre_attack":[]},"3.4":{"nist_csf":["DE.CM-01"],"iso_27001":["A.8.16"],"pci_dss":["10.4.1"],"mitre_attack":["T1562"]},"3.5":{"nist_csf":["PR.AA-05","PR.IR-01"],"iso_27001":["A.5.15","A.8.3"],"pci_dss":["1.3.1","7.2.1"],"mitre_attack":["T1133","T1190"]},"3.6":{"nist_csf":["PR.AA-05","PR.IR-01"],"iso_27001":["A.5.15","A.8.3"],"pci_dss":["1.3.1","1.3.2"],"mitre_attack":["T1133","T1190"]},"3.7":{"nist_csf":["PR.AA-05","PR.IR-01"],"iso_27001":["A.5.15","A.8.3"],"pci_dss":["1.3.1"],"mitre_attack":["T1046"]},"3.8":{"nist_csf":["DE.CM-01","PR.PS-04"],"iso_27001":["A.8.15","A.8.16"],"pci_dss":["10.2.1","10.2.4"],"mitre_attack":["T1070","T1562"]},"3.9":{"nist_csf":["DE.CM-01","PR.PS-04"],"iso_27001":["A.8.15"],"pci_dss":["10.2.1"],"mitre_attack":["T1070"]},"3.10":{"nist_csf":["PR.PS-05","PR.IR-01"],"iso_27001":["A.8.20","A.8.21"],"pci_dss":["1.3.3"],"mitre_attack":["T1499","T1557"]},"3.11":{"nist_csf":["PR.PS-05","PR.IR-01"],"iso_27001":["A.8.20","A.8.21"],"pci_dss":["1.3.3"],"mitre_attack":["T1499","T1040"]},"3.12":{"nist_csf":["PR.PS-05","PR.IR-01"],"iso_27001":["A.8.20"],"pci_dss":["1.3.3"],"mitre_attack":["T1557","T1599"]},"3.13":{"nist_csf":["DE.CM-01","PR.IR-04"],"iso_27001":["A.8.6"],"pci_dss":["10.7.1"],"mitre_attack":["T1499"]},"3.14":{"nist_csf":["PR.PS-05","PR.IR-01"],"iso_27001":["A.8.20","A.8.21"],"pci_dss":["1.2.1"],"mitre_attack":["T1599","T1557"]},"3.15":{"nist_csf":["PR.PS-05","PR.IR-01"],"iso_27001":["A.8.20","A.8.21"],"pci_dss":["1.2.1"],"mitre_attack":["T1046"]},"3.16":{"nist_csf":["PR.PS-05","PR.IR-01"],"iso_27001":["A.8.20","A.8.21"],"pci_dss":["1.2.1"],"mitre_attack":["T1046"]},"3.17":{"nist_csf":["PR.PS-05","PR.IR-01"],"iso_27001":["A.8.20"],"pci_dss":["1.2.1"],"mitre_attack":["T1046","T1040"]},"3.18":{"nist_csf":["PR.PS-01","PR.IR-01"],"iso_27001":["A.8.20"],"pci_dss":["1.3.1"],"mitre_attack":["T1599"]},"3.19":{"nist_csf":["PR.PS-01","PR.IR-01"],"iso_27001":["A.8.20"],"pci_dss":["1.3.1"],"mitre_attack":["T1557"]},"3.20":{"nist_csf":["DE.CM-01","DE.AE-02"],"iso_27001":["A.8.15","A.8.16"],"pci_dss":["10.2.1","10.7.1"],"mitre_attack":["T1070","T1562"]}};
+const FW_META = {nist_csf:{abbr:'NIST',cls:'ctag-nist'},iso_27001:{abbr:'ISO',cls:'ctag-iso'},pci_dss:{abbr:'PCI',cls:'ctag-pci'},mitre_attack:{abbr:'ATT&CK',cls:'ctag-mitre'},gdpr:{abbr:'GDPR',cls:'ctag-gdpr'},hipaa:{abbr:'HIPAA',cls:'ctag-hipaa'},soc2:{abbr:'SOC2',cls:'ctag-soc2'}};
+
+// GDPR / HIPAA / SOC 2 mappings (mirrors tools/compliance_mappings.py REGULATORY_MAPPINGS)
+const REGULATORY_MAPS = {"1.1":{"gdpr":["Art.32"],"hipaa":["§164.312(d)","§164.308(a)(5)"],"soc2":["CC6.1","CC6.2"]},"1.2":{"gdpr":["Art.32"],"hipaa":["§164.312(d)"],"soc2":["CC6.2"]},"1.3":{"gdpr":["Art.32"],"hipaa":["§164.312(d)"],"soc2":["CC6.2"]},"1.4a":{"gdpr":["Art.32"],"hipaa":["§164.312(d)"],"soc2":["CC6.2"]},"1.4b":{"gdpr":["Art.32"],"hipaa":["§164.312(d)"],"soc2":["CC6.2"]},"1.5":{"gdpr":["Art.32"],"hipaa":["§164.312(d)","§164.308(a)(3)"],"soc2":["CC6.2"]},"1.6":{"gdpr":["Art.32"],"hipaa":["§164.312(d)"],"soc2":["CC6.2"]},"1.7":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(3)"],"soc2":["CC6.2"]},"1.8":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.308(a)(3)"],"soc2":["CC6.2","CC6.3"]},"1.9":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.308(a)(3)"],"soc2":["CC6.2","CC6.3"]},"1.10":{"gdpr":["Art.32"],"hipaa":["§164.312(d)"],"soc2":["CC6.2"]},"1.11":{"gdpr":["Art.32"],"hipaa":["§164.312(d)","§164.308(a)(5)"],"soc2":["CC6.1"]},"1.12":{"gdpr":["Art.32"],"hipaa":["§164.312(a)(2)(iii)","§164.308(a)(5)"],"soc2":["CC6.1"]},"1.13":{"gdpr":["Art.32"],"hipaa":["§164.312(a)(2)(iii)"],"soc2":["CC6.1"]},"2.1.1":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(5)"],"soc2":["CC6.1"]},"2.1.2":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(5)"],"soc2":["CC6.1"]},"2.1.3":{"gdpr":["Art.32"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"2.1.4":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(7)"],"soc2":["CC8.1"]},"2.1.5":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.6"]},"2.1.6":{"gdpr":["Art.32"],"hipaa":["§164.312(e)(1)"],"soc2":["CC6.6"]},"2.1.7":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.6"]},"2.1.8":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(1)"],"soc2":["CC6.1"]},"2.1.9":{"gdpr":["Art.32"],"hipaa":["§164.312(e)(1)","§164.312(a)(2)(iv)"],"soc2":["CC6.7"]},"2.1.10":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.6"]},"2.2.1":{"gdpr":["Art.32"],"hipaa":["§164.312(e)(1)"],"soc2":["CC6.6","CC6.7"]},"2.2.2":{"gdpr":["Art.32"],"hipaa":["§164.312(e)(1)"],"soc2":["CC6.7"]},"2.2.3":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"2.2.4":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"2.3.1":{"gdpr":["Art.32"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"2.3.2":{"gdpr":["Art.32"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"2.4.1":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(7)"],"soc2":["A1.2"]},"2.4.2":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(7)"],"soc2":["A1.2"]},"2.4.3":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(7)"],"soc2":["A1.2"]},"2.5.1":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(2)(iii)"],"soc2":["CC6.1"]},"2.5.2":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(2)(iii)"],"soc2":["CC6.1"]},"2.5.3":{"gdpr":["Art.32"],"hipaa":["§164.312(e)(1)"],"soc2":["CC6.7"]},"2.5.4":{"gdpr":["Art.32"],"hipaa":["§164.312(d)","§164.308(a)(3)"],"soc2":["CC6.1","CC6.2"]},"2.5.5":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.3","CC6.6"]},"2.6.1":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"2.6.2":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"2.6.3":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"3.1":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.3","CC6.6"]},"3.2":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.3"]},"3.3":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(1)"],"soc2":["CC8.1"]},"3.4":{"gdpr":["Art.32"],"hipaa":["§164.312(b)"],"soc2":["CC7.1","CC7.2"]},"3.5":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.3","CC6.6"]},"3.6":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.3","CC6.6"]},"3.7":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.3"]},"3.8":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"3.9":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"3.10":{"gdpr":["Art.32"],"hipaa":["§164.312(c)(1)"],"soc2":["CC6.6"]},"3.11":{"gdpr":["Art.32"],"hipaa":["§164.312(c)(1)"],"soc2":["CC6.6"]},"3.12":{"gdpr":["Art.32"],"hipaa":["§164.312(c)(1)"],"soc2":["CC6.6"]},"3.13":{"gdpr":["Art.32"],"hipaa":["§164.312(b)"],"soc2":["A1.2","CC7.1"]},"3.14":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.6"]},"3.15":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.6"]},"3.16":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.6"]},"3.17":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.6"]},"3.18":{"gdpr":["Art.32"],"hipaa":["§164.312(e)(1)"],"soc2":["CC6.6"]},"3.19":{"gdpr":["Art.32"],"hipaa":["§164.312(e)(1)"],"soc2":["CC6.6"]},"3.20":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"NAT-1":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(1)"],"soc2":["CC7.2"]},"NAT-2":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.6"]},"NAT-3":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"RQ-1":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.3"]},"RQ-2":{"gdpr":["Art.32"],"hipaa":["§164.308(a)(1)"],"soc2":["CC7.2"]},"RQ-3":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.6"]},"RQ-4":{"gdpr":["Art.32"],"hipaa":["§164.312(b)"],"soc2":["CC6.8","CC7.2"]},"CERT-1":{"gdpr":["Art.32"],"hipaa":["§164.312(e)(1)"],"soc2":["CC6.7"]},"LOG-1":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1"]},"LOG-2":{"gdpr":["Art.32","Art.33"],"hipaa":["§164.312(b)"],"soc2":["CC7.1","CC7.2"]},"IAM-1":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.308(a)(3)","§164.312(a)(1)"],"soc2":["CC6.1","CC6.2","CC6.3"]},"IAM-2":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.308(a)(3)"],"soc2":["CC6.2","CC6.3"]},"IAM-3":{"gdpr":["Art.32"],"hipaa":["§164.312(d)"],"soc2":["CC6.1"]},"ARCH-1":{"gdpr":["Art.25","Art.32"],"hipaa":["§164.312(a)(1)"],"soc2":["CC6.3","CC6.6"]}};
+
+function complianceTags(controlId) {
+  if (!state.frameworks.length) return '';
+  const m = {...(COMPLIANCE_MAPS[controlId]||{}), ...(REGULATORY_MAPS[controlId]||{})};
+  const tags = state.frameworks.flatMap(fw => {
+    const controls = m[fw] || [];
+    if (!controls.length) return [];
+    const meta = FW_META[fw];
+    if (!meta) return [];
+    return controls.map(c => `<span class="compliance-tag ${meta.cls}" title="${meta.abbr}">${meta.abbr}:${c}</span>`);
+  });
+  return tags.length ? `<div class="compliance-tags">${tags.join('')}</div>` : '';
+}
+
+const API = '';   // Same-origin
+
+// ── Utilities ───────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const TS = () => new Date().toTimeString().slice(0,8);
+
+function showOverlay(msg='Processing...') {
+  $('overlay-label').textContent = msg;
+  $('overlay').classList.add('visible');
+}
+function hideOverlay() { $('overlay').classList.remove('visible'); }
+
+function showError(msg) {
+  $('global-error-msg').textContent = msg;
+  $('global-error').style.display = 'flex';
+  setTimeout(() => $('global-error').style.display='none', 8000);
+}
+
+function riskBadge(risk) {
+  const cls = {Critical:'badge-critical',High:'badge-high',Medium:'badge-medium',Low:'badge-low',Unknown:'badge-skip'}[risk] || 'badge-skip';
+  return `<span class="badge ${cls}">${risk||'Unknown'}</span>`;
+}
+function riskChip(risk) {
+  const cls = {Critical:'risk-critical',High:'risk-high',Medium:'risk-medium',Low:'risk-low'}[risk]||'risk-low';
+  return `<span class="risk-chip ${cls}">${risk||'Unknown'}</span>`;
+}
+function statusBadge(s) {
+  const map = {PASS:'badge-pass',FAIL:'badge-fail',MANUAL:'badge-manual',SKIPPED:'badge-skip',ERROR:'badge-fail',PENDING:'badge-pending',NA:'badge-na'};
+  return `<span class="badge ${map[s]||'badge-skip'}">${s}</span>`;
+}
+
+// ── Phase navigation ────────────────────────────────────
+function goToPhase(n) {
+  if (n > state.currentPhase) return;  // can't skip forward
+  if (n === state.currentPhase) return;
+  if (n === 1) {
+    // User explicitly went back to Client Setup — stop auto-resuming on refresh
+    localStorage.removeItem('cis_session_id');
+    activatePhase(1);
+    loadPreviousSessions();
+    return;
+  }
+  activatePhase(n);
+}
+
+function activatePhase(n) {
+  document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.step').forEach(s => { s.classList.remove('active'); s.classList.remove('done'); });
+  $(`phase-${n}`).classList.add('active');
+  $(`step-${n}`).classList.add('active');
+  for (let i=1; i<n; i++) $(`step-${i}`).classList.add('done');
+  state.currentPhase = n;
+  window.scrollTo(0,0);
+}
+
+// ── AI Provider UI ──────────────────────────────────────
+const PROVIDER_DEFAULTS = {
+  anthropic: { model: 'claude-sonnet-4-6', hint: 'claude-sonnet-4-6 · claude-haiku-4-5',     key: true,  url: false, discover: false },
+  openai:    { model: 'gpt-4o',            hint: 'gpt-4o · gpt-4o-mini · o1-mini',           key: true,  url: false, discover: false },
+  ollama:    { model: '',                  hint: 'Click Discover ↺ to list installed models', key: false, url: true,  discover: 'ollama' },
+  groq:      { model: '',                  hint: 'Click Discover ↺ to list available models', key: true,  url: false, discover: 'groq'  },
+  gemini:    { model: 'gemini/gemini-1.5-pro', hint: 'gemini/gemini-1.5-pro · gemini/gemini-1.5-flash', key: true, url: false, discover: false },
+  custom:    { model: '',                  hint: 'Any LiteLLM-supported model string',        key: true,  url: true,  discover: false },
+};
+
+// Provider prefix added automatically by LiteLLM routing
+const PROVIDER_PREFIX = { groq: 'groq/', ollama: 'ollama/', gemini: 'gemini/', openai: '', anthropic: '', custom: '' };
+
+function getAiModel() {
+  const provider = $('f-ai-provider').value;
+  const prefix   = PROVIDER_PREFIX[provider] || '';
+  const sel      = $('f-ai-model-select');
+  let   model    = (sel && sel.style.display !== 'none')
+                   ? sel.value.trim()
+                   : $('f-ai-model').value.trim();
+  // Auto-add provider prefix if user omitted it
+  if (prefix && model && !model.startsWith(prefix)) model = prefix + model;
+  return model;
+}
+
+function showModelInput() {
+  $('f-ai-model').style.display        = '';
+  $('f-ai-model-select').style.display = 'none';
+}
+
+function showModelSelect(models) {
+  const sel = $('f-ai-model-select');
+  sel.innerHTML = '';
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value       = m.litellm;
+    opt.textContent = `${m.name}`;
+    sel.appendChild(opt);
+  });
+  sel.style.display        = '';
+  $('f-ai-model').style.display = 'none';
+}
+
+function onProviderChange() {
+  const p   = $('f-ai-provider').value;
+  const cfg = PROVIDER_DEFAULTS[p] || PROVIDER_DEFAULTS.custom;
+
+  showModelInput();
+  $('f-ai-model').value          = cfg.model;
+  $('ai-model-hint').textContent = cfg.hint;
+  $('field-ai-key').style.display  = cfg.key      ? '' : 'none';
+  $('field-ai-url').style.display  = cfg.url      ? '' : 'none';
+  $('btn-discover').style.display  = cfg.discover ? '' : 'none';
+  $('ollama-status').style.display = 'none';
+
+  if (cfg.discover === 'ollama') discoverOllamaModels();
+  if (cfg.discover === 'groq')   discoverGroqModels();
+}
+
+function discoverModels() {
+  const p = $('f-ai-provider').value;
+  if (p === 'ollama') discoverOllamaModels();
+  if (p === 'groq')   discoverGroqModels();
+}
+
+async function discoverGroqModels() {
+  const apiKey = $('f-ai-key').value.trim();
+  const status = $('ollama-status');
+  status.style.display = 'block';
+  status.style.color   = 'var(--text-secondary)';
+  status.textContent   = 'Fetching Groq models...';
+
+  try {
+    const url = apiKey
+      ? `${API}/api/ai/groq-models?api_key=${encodeURIComponent(apiKey)}`
+      : `${API}/api/ai/groq-models`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed');
+
+    if (data.models.length > 0) {
+      showModelSelect(data.models);
+      status.textContent = `✅ ${data.models.length} Groq model(s) — pick one from the dropdown`;
+      status.style.color = 'var(--mint)';
+    } else {
+      status.textContent = '⚠️ No Groq models found.';
+      status.style.color = 'var(--amber)';
+    }
+  } catch(e) {
+    showModelInput();
+    $('f-ai-model').placeholder = 'llama-3.1-8b-instant';
+    status.textContent = `❌ ${e.message}`;
+    status.style.color = 'var(--crimson)';
+  }
+}
+
+async function discoverOllamaModels() {
+  const baseUrl = $('f-ai-url').value.trim() || 'http://localhost:11434';
+  const status  = $('ollama-status');
+  status.style.display = 'block';
+  status.style.color   = 'var(--text-secondary)';
+  status.textContent   = 'Connecting to Ollama...';
+
+  try {
+    const res  = await fetch(`${API}/api/ai/ollama-models?base_url=${encodeURIComponent(baseUrl)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed');
+
+    if (data.models.length > 0) {
+      showModelSelect(data.models);
+      status.textContent = `✅ ${data.models.length} model(s) found — pick one from the dropdown above`;
+      status.style.color = 'var(--mint)';
+    } else {
+      showModelInput();
+      $('f-ai-model').value = '';
+      $('f-ai-model').placeholder = 'ollama/llama3';
+      status.textContent = '⚠️ Ollama reachable but no models installed. Run: ollama pull llama3';
+      status.style.color = 'var(--amber)';
+    }
+  } catch (e) {
+    showModelInput();
+    status.textContent = `❌ Cannot reach Ollama: ${e.message}`;
+    status.style.color = 'var(--crimson)';
+  }
+}
+
+// ── Vendor selector ──────────────────────────────────────
+function onVendorChange() {
+  const vendor = $('f-vendor').value;
+  const showApi = vendor === 'checkpoint' || vendor === 'palo_alto';
+  $('field-mgmt-apikey').style.display = showApi ? '' : 'none';
+  if (vendor === 'palo_alto') {
+    $('label-mgmt-apikey').innerHTML = 'XML API Key <span style="color:var(--text-muted);font-size:10px">(optional — primary connection; falls back to SSH)</span>';
+  } else {
+    $('label-mgmt-apikey').innerHTML = 'SmartConsole API Key <span style="color:var(--text-muted);font-size:10px">(optional — for §3 checks)</span>';
+  }
+}
+
+// ── Phase 1 — Start Session ─────────────────────────────
+async function startSession() {
+  const ip       = $('f-ip').value.trim();
+  const username = $('f-user').value.trim();
+  const password = $('f-pass').value;
+  const org      = $('f-org').value.trim();
+  const aiProvider = $('f-ai-provider').value;
+  const aiKey      = $('f-ai-key').value.trim();
+  const needsKey   = aiProvider !== 'ollama';
+
+  if (!ip || !username || !password || !org) {
+    showError('Please fill in all required fields (marked with *).');
+    return;
+  }
+  if (needsKey && !aiKey) {
+    showError(`An AI API key is required for ${aiProvider}. Enter it in the AI API Key field.`);
+    $('f-ai-key').focus();
+    return;
+  }
+
+  showOverlay('Creating session...');
+  try {
+    const res = await fetch(`${API}/api/sessions`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        ip, username, password,
+        vendor:       $('f-vendor').value,
+        api_key:      $('f-apikey').value,
+        organization: org,
+        device_role:   $('f-role').value,
+        industry:      $('f-industry').value,
+        assessor_name: $('f-assessor').value,
+        ai_model:     getAiModel(),
+        ai_api_key:   $('f-ai-key').value.trim(),
+        ai_base_url:  ($('field-ai-url').style.display !== 'none' ? $('f-ai-url').value.trim() : ''),
+        frameworks:   Array.from(document.querySelectorAll('.framework-check input:checked')).map(el => el.value),
+      }),
+    });
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.detail || 'Session creation failed');
+    }
+    const data = await res.json();
+    state.sessionId  = data.session_id;
+    state.frameworks = Array.from(document.querySelectorAll('.framework-check input:checked')).map(el => el.value);
+    localStorage.setItem('cis_session_id', data.session_id);
+
+    $('session-badge').style.display = 'block';
+    $('session-id-display').textContent = data.session_id.slice(0,8).toUpperCase();
+
+    hideOverlay();
+    activatePhase(2);
+    connectWebSocket();
+    await startAudit();
+
+  } catch(e) {
+    hideOverlay();
+    showError(e.message);
+  }
+}
+
+// ── WebSocket ────────────────────────────────────────────
+function connectWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url   = `${proto}://${location.host}/ws/${state.sessionId}`;
+  state.ws    = new WebSocket(url);
+
+  state.ws.onmessage = e => handleWsEvent(JSON.parse(e.data));
+  state.ws.onclose   = () => { /* reconnect if needed */ };
+
+  // Keepalive
+  setInterval(() => {
+    if (state.ws && state.ws.readyState === WebSocket.OPEN)
+      state.ws.send('ping');
+  }, 20000);
+}
+
+function handleWsEvent(msg) {
+  switch(msg.event) {
+
+    case 'connected':
+      termLog('System ready. Starting audit...', 'phase');
+      break;
+
+    case 'phase_change':
+      termLog(msg.message, 'phase');
+      setProgress(msg.pct || 0, msg.message);
+      if (msg.phase === 'manual_review') {
+        onAuditComplete(msg);
+      }
+      break;
+
+    case 'progress':
+      setProgress(msg.pct || 0, msg.message);
+      if (msg.phase === 'audit') $('live-stats').style.display = 'grid';
+      break;
+
+    case 'check_result': {
+      const f = msg.finding;
+      const icon = {PASS:'✅',FAIL:'❌',MANUAL:'⚠️',SKIPPED:'⏭️',ERROR:'🔴'}[f.status]||'?';
+      const lvl  = {PASS:'pass',FAIL:'fail',MANUAL:'warn',SKIPPED:'info',ERROR:'error'}[f.status]||'info';
+      termLog(`${icon} [${f.control_id}] ${f.description}`, lvl);
+      state.liveCounts[f.status] = (state.liveCounts[f.status]||0)+1;
+      updateLiveStats();
+      break;
+    }
+
+    case 'audit_complete':
+      termLog('Audit complete. Running AI analysis...', 'phase');
+      setProgress(60, 'AI analysis in progress...');
+      updateLiveStats(msg.summary);
+      break;
+
+    case 'manual_update':
+      updateManualGate(msg.completed, msg.total, msg.is_finalizable, msg.stats);
+      break;
+
+    case 'report_finalized':
+      onReportFinalized(msg);
+      break;
+
+    case 'error':
+      termLog(`ERROR: ${msg.message}`, 'error');
+      setProgress(0, 'Error occurred');
+      showError(msg.message);
+      break;
+
+    case 'ping':
+      if (state.ws) state.ws.send('ping');
+      break;
+  }
+}
+
+// ── Terminal ─────────────────────────────────────────────
+function termLog(msg, level='info') {
+  const t   = $('terminal');
+  const line = document.createElement('div');
+  line.className = 'terminal-line';
+  line.innerHTML = `<span class="terminal-ts">${TS()}</span><span class="terminal-msg ${level}">${escHtml(msg)}</span>`;
+  // Remove cursor from last line
+  t.querySelectorAll('.terminal-cursor').forEach(c=>c.remove());
+  t.appendChild(line);
+  // Add cursor to new line
+  line.querySelector('.terminal-msg').insertAdjacentHTML('beforeend', '<span class="terminal-cursor"></span>');
+  t.scrollTop = t.scrollHeight;
+}
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Progress ─────────────────────────────────────────────
+function setProgress(pct, label) {
+  $('progress-fill').style.width = pct + '%';
+  $('progress-pct').textContent  = pct + '%';
+  if (label) $('progress-label').textContent = label;
+}
+
+function updateLiveStats(summary) {
+  const c = summary || state.liveCounts;
+  $('s-pass').textContent   = c.PASS   || 0;
+  $('s-fail').textContent   = c.FAIL   || 0;
+  $('s-manual').textContent = c.MANUAL || 0;
+  $('s-skip').textContent   = c.SKIPPED|| 0;
+  const total  = (c.PASS||0)+(c.FAIL||0)+(c.MANUAL||0)+(c.SKIPPED||0)+(c.ERROR||0);
+  const score  = total ? Math.round((c.PASS||0)/total*100) : 0;
+  $('s-score').textContent = score + '%';
+}
+
+// ── Audit start ───────────────────────────────────────────
+async function startAudit() {
+  try {
+    const res = await fetch(`${API}/api/sessions/${state.sessionId}/audit/start`, {method:'POST'});
+    if (!res.ok) throw new Error((await res.json()).detail);
+    setProgress(2, 'Establishing SSH connection...');
+    termLog('Audit started. Connecting to firewall...', 'phase');
+  } catch(e) {
+    showError('Failed to start audit: ' + e.message);
+  }
+}
+
+// ── On audit complete → move to manual review ─────────────
+async function onAuditComplete(msg) {
+  setProgress(100, 'Automated audit complete');
+  $('phase2-sub').textContent = 'Automated audit and AI analysis complete. Proceeding to manual review...';
+  termLog('Transitioning to manual review phase...', 'phase');
+
+  await new Promise(r => setTimeout(r, 1500));
+
+  // Load workbench
+  await loadWorkbench();
+
+  // Render narrative
+  if (msg.narrative) renderNarrative(msg.narrative, msg.attack_chains || []);
+  if (msg.summary)   updateManualStats(msg.summary);
+
+  activatePhase(3);
+}
+
+// ── Workbench ─────────────────────────────────────────────
+async function loadWorkbench() {
+  showOverlay('Loading manual checks...');
+  try {
+    const res = await fetch(`${API}/api/sessions/${state.sessionId}/workbench`);
+    if (!res.ok) throw new Error('Failed to load workbench');
+    const data = await res.json();
+    state.workbenchItems = data.items;
+
+    // Pre-populate manualResults from server data so the filter has a single
+    // consistent source of truth regardless of browser/session history.
+    data.items.forEach(item => {
+      if (item.current_status && item.current_status !== 'PENDING') {
+        state.manualResults[item.control_id] = {
+          status:   item.current_status,
+          evidence: item.evidence       || '',
+          notes:    item.assessor_notes || '',
+        };
+      }
+    });
+
+    updateManualGate(data.completed, data.total, data.is_finalizable, null);
+    renderWorkbench(data.items);
+  } catch(e) {
+    showError(e.message);
+  } finally {
+    hideOverlay();
+  }
+}
+
+function renderWorkbench(items) {
+  const list = $('workbench-list');
+  list.innerHTML = '';
+  const filtered = filterItems(items, state.currentFilter);
+  if (filtered.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:40px">No checks match this filter.</p>';
+    return;
+  }
+  filtered.forEach(item => {
+    const saved = state.manualResults[item.control_id] || {};
+    const verdict = saved.status || item.current_status;
+    const isComplete = ['PASS','FAIL','NA'].includes(verdict);
+    const completeCls = isComplete ? `is-complete ${verdict.toLowerCase()}-complete` : '';
+
+    const g = item.guidance || {};
+    const steps = (g.steps||[]).map(s=>`<li>${escHtml(s)}</li>`).join('');
+    const criteria = g.pass_criteria || g.fail_criteria ? `
+      <div class="guidance-criteria">
+        ${g.pass_criteria ? `<div class="criteria-pass"><div class="criteria-label">Pass if</div>${escHtml(g.pass_criteria)}</div>` : ''}
+        ${g.fail_criteria ? `<div class="criteria-fail"><div class="criteria-label">Fail if</div>${escHtml(g.fail_criteria)}</div>` : ''}
+      </div>` : '';
+
+    const card = document.createElement('div');
+    card.className = `check-item ${completeCls}`;
+    card.dataset.cid = item.control_id;
+    card.dataset.status = verdict;
+    card.innerHTML = `
+      <div class="check-header" onclick="toggleCheck(this)">
+        <span class="check-cid">${escHtml(item.control_id)}</span>
+        <span class="check-desc">${escHtml(item.description)}</span>
+        <span class="check-risk">${riskBadge(item.ai_risk)}</span>
+        <span>${isComplete ? statusBadge(verdict==='NA'?'NA':verdict) : statusBadge('PENDING')}</span>
+        <span class="check-chevron">›</span>
+      </div>
+      <div class="check-body">
+        ${complianceTags(item.control_id)}
+        ${g.where ? `<div class="guidance-box">
+          <div class="guidance-where">📍 ${escHtml(g.where)}</div>
+          ${steps ? `<ul class="guidance-steps">${steps}</ul>` : ''}
+          ${criteria}
+        </div>` : item.notes ? `<div class="guidance-box"><div class="guidance-where">ℹ️ Note</div><p style="font-size:12px;color:var(--text-secondary)">${escHtml(item.notes)}</p></div>` : ''}
+        <div class="verdict-row">
+          <button class="verdict-btn ${verdict==='PASS'?'selected':''}" data-v="PASS" onclick="selectVerdict('${item.control_id}','PASS',this)">✅ Pass</button>
+          <button class="verdict-btn ${verdict==='FAIL'?'selected':''}" data-v="FAIL" onclick="selectVerdict('${item.control_id}','FAIL',this)">❌ Fail</button>
+          <button class="verdict-btn ${verdict==='NA'?'selected':''}" data-v="NA"   onclick="selectVerdict('${item.control_id}','NA',this)">— N/A</button>
+        </div>
+        <div class="form-grid" style="gap:10px">
+          <div class="field">
+            <label>Evidence / Observation</label>
+            <textarea id="ev-${item.control_id}" placeholder="What did you see in SmartConsole or Clish?">${escHtml(saved.evidence||'')}</textarea>
+          </div>
+          <div class="field">
+            <label>Assessor Notes</label>
+            <textarea id="nt-${item.control_id}" placeholder="Additional context or caveats...">${escHtml(saved.notes||'')}</textarea>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px">
+          <button class="btn btn-sm btn-outline" onclick="saveManualFinding('${item.control_id}')">Save Finding</button>
+        </div>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+function filterItems(items, filter) {
+  if (filter === 'all') return items;
+  if (filter === 'pending') return items.filter(i => {
+    const s = (state.manualResults[i.control_id]||{}).status || i.current_status;
+    return !['PASS','FAIL','NA'].includes(s);
+  });
+  return items.filter(i => {
+    const s = (state.manualResults[i.control_id]||{}).status || i.current_status;
+    return s === filter;
+  });
+}
+
+function filterChecks(filter, btn) {
+  state.currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderWorkbench(state.workbenchItems);
+}
+
+function toggleCheck(header) {
+  const item = header.parentElement;
+  item.classList.toggle('expanded');
+}
+
+function selectVerdict(cid, verdict, btn) {
+  const card = document.querySelector(`.check-item[data-cid="${cid}"]`);
+  card.querySelectorAll('.verdict-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  if (!state.manualResults[cid]) state.manualResults[cid] = {};
+  state.manualResults[cid].status = verdict;
+}
+
+async function saveManualFinding(cid) {
+  const verdict  = (state.manualResults[cid]||{}).status;
+  const evidence = $(`ev-${cid}`)?.value || '';
+  const notes    = $(`nt-${cid}`)?.value || '';
+
+  if (!verdict) { showError('Select Pass / Fail / N/A before saving.'); return; }
+
+  state.manualResults[cid] = {status: verdict, evidence, notes};
+
+  try {
+    const res = await fetch(`${API}/api/sessions/${state.sessionId}/manual/${cid}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({status: verdict, evidence, notes}),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail);
+    const data = await res.json();
+
+    // Update the gate directly from the REST response — don't rely on WebSocket alone
+    updateManualGate(data.completed, data.total, data.is_finalizable, null);
+
+    // Keep workbenchItems in sync so the filter fallback is never stale
+    const wi = state.workbenchItems.find(i => i.control_id === cid);
+    if (wi) wi.current_status = verdict;
+
+    // Re-render the list so the filter reflects the new status immediately
+    renderWorkbench(state.workbenchItems);
+
+    // If the card is still visible (e.g. 'all' filter), update it in-place too
+    const card = document.querySelector(`.check-item[data-cid="${cid}"]`);
+    if (card) {
+      card.classList.add('is-complete', `${verdict.toLowerCase()}-complete`);
+      card.dataset.status = verdict;
+      const headerBadges = card.querySelectorAll('.check-header .badge');
+      const lastBadge = headerBadges[headerBadges.length-1];
+      if (lastBadge) lastBadge.outerHTML = statusBadge(verdict==='NA'?'NA':verdict);
+    }
+
+  } catch(e) { showError(e.message); }
+}
+
+function updateManualGate(completed, total, isFinalizable, stats) {
+  const pct = total ? Math.round(completed/total*100) : 0;
+  $('gate-fill').style.width = pct + '%';
+  $('gate-sub').textContent = `${completed} of ${total} checks resolved`;
+  $('manual-score-chip').textContent = `${completed}/${total} complete`;
+
+  if (isFinalizable) {
+    $('gate-icon').textContent  = '✅';
+    $('gate-title').textContent = 'All manual checks resolved — ready to finalize';
+    $('btn-finalize').disabled  = false;
+  } else {
+    $('gate-icon').textContent  = '🔒';
+    $('gate-title').textContent = 'Complete all manual checks to finalize the report';
+    $('btn-finalize').disabled  = true;
+  }
+
+  if (stats) updateManualStats(stats);
+}
+
+function updateManualStats(stats) {
+  $('ms-pass').textContent   = stats.PASS    || 0;
+  $('ms-fail').textContent   = stats.FAIL    || 0;
+  $('ms-manual').textContent = stats.MANUAL  || 0;
+  $('ms-skip').textContent   = stats.SKIPPED || 0;
+  $('ms-score').textContent  = (stats.score  || 0) + '%';
+}
+
+// ── Narrative rendering ───────────────────────────────────
+function renderNarrative(narrative, chains) {
+  const es = narrative.executive_summary || {};
+  $('exec-headline').textContent = es.headline || '';
+  $('exec-para1').textContent    = es.paragraph_1 || '';
+  $('overall-risk-chip').innerHTML = riskChip(narrative.overall_risk_rating);
+
+  // Mini attack chains
+  const mini = $('attack-chains-mini');
+  mini.innerHTML = '';
+  (chains||[]).slice(0,2).forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'chain-card';
+    el.style.cssText = 'margin-bottom:10px;padding:14px';
+    el.innerHTML = `
+      <div class="chain-header" style="margin-bottom:6px">
+        <div class="chain-title" style="font-size:12px">${escHtml(c.chain_name||'')}</div>
+        ${riskBadge(c.risk_level)}
+      </div>
+      <div class="chain-body" style="font-size:11px">${escHtml((c.attack_narrative||'').slice(0,120))}...</div>
+      <div class="chain-controls">
+        ${(c.controls_involved||[]).map(id=>`<span class="control-pill">${id}</span>`).join('')}
+      </div>`;
+    mini.appendChild(el);
+  });
+
+  $('narrative-section').style.display = 'block';
+}
+
+// ── Finalize ──────────────────────────────────────────────
+async function finalizeReport() {
+  showOverlay('Running final AI analysis...\nThis may take 30–60 seconds.');
+  try {
+    const res = await fetch(`${API}/api/sessions/${state.sessionId}/report/finalize`, {method:'POST'});
+    if (!res.ok) throw new Error((await res.json()).detail);
+
+    // Load final report data
+    const rep = await fetch(`${API}/api/sessions/${state.sessionId}/report`);
+    state.reportData = await rep.json();
+    renderExportPage(state.reportData);
+    hideOverlay();
+    activatePhase(4);
+    $('finalize-success').style.display = 'flex';
+
+  } catch(e) {
+    hideOverlay();
+    showError(e.message);
+  }
+}
+
+function onReportFinalized(msg) {
+  if (msg.summary) {
+    $('es-pass').textContent   = msg.summary.PASS    || 0;
+    $('es-fail').textContent   = msg.summary.FAIL    || 0;
+    $('es-manual').textContent = msg.summary.MANUAL  || 0;
+    $('es-skip').textContent   = msg.summary.SKIPPED || 0;
+    $('es-score').textContent  = (msg.summary.score  || 0) + '%';
+  }
+}
+
+function renderExportPage(data) {
+  const s = data.summary || {};
+  $('es-pass').textContent   = s.PASS    || 0;
+  $('es-fail').textContent   = s.FAIL    || 0;
+  $('es-manual').textContent = s.MANUAL  || 0;
+  $('es-skip').textContent   = s.SKIPPED || 0;
+  $('es-score').textContent  = (s.score  || 0) + '%';
+
+  const n  = data.narrative || {};
+  const es = n.executive_summary || {};
+  $('final-headline').textContent = es.headline || '—';
+  $('final-para').textContent     = es.paragraph_1 || '';
+  $('final-risk-chip').innerHTML  = riskChip(n.overall_risk_rating);
+
+  const ctx = data.meta?.device_context || {};
+  $('final-context').innerHTML = [
+    `Target: ${ctx.target_ip || '—'}`,
+    `Organization: ${ctx.organization || '—'}`,
+    `Device Role: ${ctx.device_role || '—'}`,
+    `Industry: ${ctx.industry || '—'}`,
+    `Assessor: ${ctx.assessor_name || '—'}`,
+  ].join('<br>');
+}
+
+// ── Export ────────────────────────────────────────────────
+async function exportReport(fmt) {
+  if (!state.sessionId) { showError('No active session.'); return; }
+  showOverlay(`Generating ${fmt.toUpperCase()} report...`);
+  try {
+    const res = await fetch(`${API}/api/sessions/${state.sessionId}/export/${fmt}`);
+    if (!res.ok) throw new Error((await res.json()).detail || 'Export failed');
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const cd   = res.headers.get('content-disposition') || '';
+    const fn   = cd.match(/filename="([^"]+)"/)?.[1] || `report.${fmt==='excel'?'xlsx':fmt}`;
+    a.href = url; a.download = fn; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    showError(e.message);
+  } finally {
+    hideOverlay();
+  }
+}
+
+async function exportConsulting() {
+  if (!state.sessionId) { showError('No active session.'); return; }
+  showOverlay('Generating Consulting Report...');
+  try {
+    const res = await fetch(`${API}/api/sessions/${state.sessionId}/export/consulting`);
+    if (!res.ok) throw new Error((await res.json()).detail || 'Export failed');
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const cd   = res.headers.get('content-disposition') || '';
+    const fn   = cd.match(/filename="([^"]+)"/)?.[1] || 'consulting_report.docx';
+    a.href = url; a.download = fn; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    showError(e.message);
+  } finally {
+    hideOverlay();
+  }
+}
+
+// ── New Assessment ────────────────────────────────────────
+async function newAssessment() {
+  if (state.sessionId) {
+    fetch(`${API}/api/sessions/${state.sessionId}`, {method:'DELETE'}).catch(()=>{});
+  }
+  localStorage.removeItem('cis_session_id');
+  state.sessionId     = null;
+  state.currentPhase  = 1;
+  state.ws            = null;
+  state.liveCounts    = {PASS:0,FAIL:0,MANUAL:0,SKIPPED:0,ERROR:0};
+  state.workbenchItems= [];
+  state.manualResults = {};
+  state.reportData    = null;
+
+  $('session-badge').style.display = 'none';
+  $('terminal').innerHTML = '';
+  $('workbench-list').innerHTML = '';
+  setProgress(0,'');
+  document.querySelectorAll('.step').forEach(s=>{ s.classList.remove('done'); s.classList.remove('active'); });
+  activatePhase(1);
+}
+
+// ── Core session restore by ID ────────────────────────────
+async function doResumeSession(id) {
+  const res = await fetch(`${API}/api/sessions/${id}`);
+  if (!res.ok) return false;
+  const session = await res.json();
+  const s = session.state;
+
+  state.sessionId = id;
+  state.frameworks = session.frameworks || [];
+  localStorage.setItem('cis_session_id', id);
+  $('session-badge').style.display = 'block';
+  $('session-id-display').textContent = id.slice(0,8).toUpperCase();
+
+  if (s === 'MANUAL_REVIEW') {
+    connectWebSocket();
+    await loadWorkbench();
+    try {
+      const repRes = await fetch(`${API}/api/sessions/${id}/report`);
+      if (repRes.ok) {
+        const report = await repRes.json();
+        if (report.narrative) renderNarrative(report.narrative, report.attack_chains || []);
+        if (report.summary)   updateManualStats(report.summary);
+      }
+    } catch(_) {}
+    activatePhase(3);
+    return true;
+
+  } else if (s === 'COMPLETE') {
+    const repRes = await fetch(`${API}/api/sessions/${id}/report`);
+    if (repRes.ok) renderExportPage(await repRes.json());
+    activatePhase(4);
+    return true;
+
+  } else if (s === 'AUDITING' || s === 'AI_ANALYSIS') {
+    connectWebSocket();
+    activatePhase(2);
+    termLog('Reconnected. Audit is still running — waiting for events...', 'phase');
+    return true;
+
+  } else {
+    // ERROR / CREATED — can't resume without credentials
+    localStorage.removeItem('cis_session_id');
+    return false;
+  }
+}
+
+// ── Auto-resume last session on page load ─────────────────
+async function tryResumeSession() {
+  const savedId = localStorage.getItem('cis_session_id');
+  if (!savedId) return;
+  showOverlay('Reconnecting to session...');
+  try {
+    const ok = await doResumeSession(savedId);
+    if (!ok) localStorage.removeItem('cis_session_id');
+  } catch(_) {
+    localStorage.removeItem('cis_session_id');
+  } finally {
+    hideOverlay();
+  }
+}
+
+// ── Explicitly continue a chosen previous session ─────────
+async function resumeSession(id) {
+  showOverlay('Loading assessment...');
+  try {
+    const ok = await doResumeSession(id);
+    if (!ok) showError('Cannot resume this session — credentials are no longer available. Please start a new assessment.');
+  } catch(e) {
+    showError(e.message);
+  } finally {
+    hideOverlay();
+  }
+}
+
+// ── Previous sessions list ────────────────────────────────
+async function loadPreviousSessions() {
+  try {
+    const res = await fetch(`${API}/api/sessions`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = data.sessions || [];
+    if (list.length === 0) return;
+
+    const container = $('prev-sessions-list');
+    container.innerHTML = '';
+
+    const STATE_LABEL = {
+      MANUAL_REVIEW: 'Manual Review',
+      COMPLETE:      'Complete',
+      AUDITING:      'Auditing',
+      AI_ANALYSIS:   'AI Analysis',
+      ERROR:         'Error',
+    };
+    const STATE_COLOR = {
+      MANUAL_REVIEW: 'var(--amber)',
+      COMPLETE:      'var(--mint)',
+      AUDITING:      'var(--cyan)',
+      AI_ANALYSIS:   'var(--cyan)',
+      ERROR:         'var(--red)',
+    };
+
+    const VENDOR_LABEL = { checkpoint: 'Check Point', palo_alto: 'Palo Alto' };
+
+    list.forEach(s => {
+      const ctx    = s.device_context || {};
+      const org    = ctx.organization || '—';
+      const ip     = ctx.target_ip    || '—';
+      const label  = STATE_LABEL[s.state] || s.state;
+      const color  = STATE_COLOR[s.state] || 'var(--text-muted)';
+      const date   = new Date(s.updated_at).toLocaleString([], {dateStyle:'medium', timeStyle:'short'});
+      const vendor = VENDOR_LABEL[ctx.vendor || s.vendor] || ctx.vendor || '—';
+      const canResume  = ['MANUAL_REVIEW','COMPLETE','AUDITING','AI_ANALYSIS'].includes(s.state);
+      const hasAudit   = s.stats && s.stats.total > 0;
+      const canRetryAI = s.state === 'ERROR' && hasAudit;
+
+      const row = document.createElement('div');
+      row.className = 'prev-session-row';
+      row.innerHTML = `
+        <div class="prev-session-meta">
+          <div class="prev-session-org">${escHtml(org)}</div>
+          <div class="prev-session-sub">${escHtml(ip)} &nbsp;·&nbsp; ${escHtml(vendor)} &nbsp;·&nbsp; <span style="color:${color}">${label}</span> &nbsp;·&nbsp; ${date}
+            ${hasAudit ? `&nbsp;·&nbsp; ${s.stats.PASS}✅ ${s.stats.FAIL}❌` : ''}
+          </div>
+          ${canRetryAI ? `<div style="font-size:11px;color:var(--amber);margin-top:3px">SSH audit complete — AI enrichment failed. Retry with a different model.</div>` : ''}
+        </div>
+        <div class="prev-session-actions">
+          ${canResume  ? `<button class="btn btn-sm btn-primary" onclick="resumeSession('${s.session_id}')">Continue →</button>` : ''}
+          ${canRetryAI ? `<button class="btn btn-sm btn-secondary" onclick="showRetryAIModal('${s.session_id}')">Retry AI →</button>` : ''}
+          <button class="btn btn-sm btn-outline" onclick="deletePreviousSession('${s.session_id}', this)">Delete</button>
+        </div>`;
+      container.appendChild(row);
+    });
+
+    $('prev-sessions-card').style.display = 'block';
+  } catch(_) {}
+}
+
+function showRetryAIModal(sessionId) {
+  $('retry-session-id').value = sessionId;
+  // Pre-fill with current form values if available
+  $('retry-ai-model').value   = getAiModel() || 'claude-sonnet-4-6';
+  $('retry-ai-key').value     = $('f-ai-key') ? $('f-ai-key').value : '';
+  $('retry-ai-url').value     = ($('field-ai-url') && $('field-ai-url').style.display !== 'none') ? $('f-ai-url').value : '';
+  $('retry-ai-modal').style.display = 'flex';
+}
+
+function hideRetryAIModal() {
+  $('retry-ai-modal').style.display = 'none';
+}
+
+async function submitRetryAI() {
+  const sessionId = $('retry-session-id').value;
+  const model     = $('retry-ai-model').value.trim();
+  const apiKey    = $('retry-ai-key').value.trim();
+  const baseUrl   = $('retry-ai-url').value.trim();
+
+  if (!model) { alert('Please enter an AI model.'); return; }
+
+  hideRetryAIModal();
+  showOverlay('Starting AI re-analysis...');
+
+  try {
+    const res = await fetch(`${API}/api/sessions/${sessionId}/ai/rerun`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ ai_model: model, ai_api_key: apiKey, ai_base_url: baseUrl }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to start AI re-analysis');
+
+    state.sessionId = sessionId;
+    localStorage.setItem('cis_session_id', sessionId);
+    activatePhase(2);
+    connectWebSocket();
+    termLog(`AI re-analysis started with model: ${model}`, 'phase');
+  } catch(e) {
+    showError(e.message);
+  } finally {
+    hideOverlay();
+  }
+}
+
+async function deletePreviousSession(id, btn) {
+  btn.disabled = true;
+  try {
+    await fetch(`${API}/api/sessions/${id}`, {method: 'DELETE'});
+    const row = btn.closest('.prev-session-row');
+    row.remove();
+    if ($('prev-sessions-list').children.length === 0)
+      $('prev-sessions-card').style.display = 'none';
+    if (localStorage.getItem('cis_session_id') === id)
+      localStorage.removeItem('cis_session_id');
+  } catch(_) { btn.disabled = false; }
+}
+
+async function deleteAllSessions(btn) {
+  if (!confirm('Delete all previous sessions? This cannot be undone.')) return;
+  btn.disabled = true;
+  try {
+    await fetch(`${API}/api/sessions`, {method: 'DELETE'});
+    $('prev-sessions-list').innerHTML = '';
+    $('prev-sessions-card').style.display = 'none';
+    localStorage.removeItem('cis_session_id');
+  } catch(_) { btn.disabled = false; }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  await tryResumeSession();
+  // Only show previous sessions if we didn't auto-resume into one
+  if (state.currentPhase === 1) loadPreviousSessions();
+});
+</script>
+<!-- Retry AI Modal -->
+<div id="retry-ai-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:12px;padding:32px;width:480px;max-width:95vw">
+    <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:6px">Retry AI Analysis</div>
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:20px">The SSH audit data is intact. Choose an AI model to re-run enrichment, attack chains, and narrative generation.</div>
+    <input type="hidden" id="retry-session-id">
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">AI Model</label>
+      <input id="retry-ai-model" type="text" placeholder="claude-sonnet-4-6 / gpt-4o / ollama/llama3" style="width:100%;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">API Key <span style="color:var(--crimson)">*</span> <span style="font-weight:400">(required — empty only for Ollama)</span></label>
+      <input id="retry-ai-key" type="password" placeholder="sk-ant-... / gsk_... / sk-..." style="width:100%;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:24px">
+      <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px">Base URL <span style="font-weight:400">(for Ollama / custom)</span></label>
+      <input id="retry-ai-url" type="text" placeholder="http://localhost:11434" style="width:100%;box-sizing:border-box">
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="hideRetryAIModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitRetryAI()">Retry AI →</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
