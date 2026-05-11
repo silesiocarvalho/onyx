@@ -626,6 +626,12 @@ html, body {
             <label id="label-mgmt-apikey">SmartConsole API Key <span style="color:var(--text-muted);font-size:10px">(optional — for §3 checks)</span></label>
             <input id="f-apikey" type="password" placeholder="Leave blank to use username/password" autocomplete="off">
           </div>
+          <div class="field" id="field-capture-evidence" style="display:none; grid-column:1/-1">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input id="f-capture-evidence" type="checkbox" style="width:16px;height:16px;cursor:pointer">
+              <span>Enable browser evidence capture <span style="color:var(--text-muted);font-size:10px">(PAN-OS only — requires Playwright + Chromium)</span></span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -1213,6 +1219,8 @@ function onVendorChange() {
   const vendor = $('f-vendor').value;
   const showApi = vendor === 'checkpoint' || vendor === 'palo_alto';
   $('field-mgmt-apikey').style.display = showApi ? '' : 'none';
+  $('field-capture-evidence').style.display = vendor === 'palo_alto' ? '' : 'none';
+  if (vendor !== 'palo_alto') $('f-capture-evidence').checked = false;
   if (vendor === 'palo_alto') {
     $('label-mgmt-apikey').innerHTML = 'XML API Key <span style="color:var(--text-muted);font-size:10px">(optional — primary connection; falls back to SSH)</span>';
   } else {
@@ -1256,7 +1264,8 @@ async function startSession() {
         ai_model:     getAiModel(),
         ai_api_key:   $('f-ai-key').value.trim(),
         ai_base_url:  ($('field-ai-url').style.display !== 'none' ? $('f-ai-url').value.trim() : ''),
-        frameworks:   Array.from(document.querySelectorAll('.framework-check input:checked')).map(el => el.value),
+        frameworks:        Array.from(document.querySelectorAll('.framework-check input:checked')).map(el => el.value),
+        capture_evidence:  $('f-capture-evidence').checked,
       }),
     });
     if (!res.ok) {

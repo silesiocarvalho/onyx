@@ -151,6 +151,8 @@ class StartSessionRequest(BaseModel):
     frameworks: list[str] = Field(default=[], description="Compliance frameworks: nist_csf, iso_27001, pci_dss, mitre_attack")
     # Firewall vendor
     vendor: str = Field(default="checkpoint", description="checkpoint | palo_alto")
+    # Playwright evidence capture (PAN-OS only, opt-in)
+    capture_evidence: bool = Field(default=False, description="Enable browser evidence capture via Playwright")
 
     @field_validator("ip")
     @classmethod
@@ -206,7 +208,8 @@ async def create_session(req: StartSessionRequest):
         "checkpoint": "Sariel Security Assessment",
         "palo_alto":  "CIS Palo Alto Firewall Benchmark",
     }
-    session.vendor = req.vendor
+    session.vendor           = req.vendor
+    session.capture_evidence = req.capture_evidence
     session.device_context = {
         "target_ip":    req.ip,
         "organization": req.organization,

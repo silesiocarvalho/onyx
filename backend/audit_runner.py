@@ -248,8 +248,8 @@ def run_audit_pipeline(session_id: str,
         audit._add = instrumented_add
         audit.run_all(level_filter="all")
 
-        # Evidence capture — PAN-OS only, best-effort, never blocks audit
-        if vendor == "palo_alto":
+        # Evidence capture — PAN-OS only, opt-in, best-effort, never blocks audit
+        if vendor == "palo_alto" and session.capture_evidence:
             _attach_evidence(audit.results, creds, emit)
 
         instr.close()
