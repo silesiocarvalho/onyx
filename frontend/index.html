@@ -2007,6 +2007,8 @@ async function deleteAllSessions(btn) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  onProviderChange();   // initialise AI provider UI (discover button, hints)
+  onVendorChange();     // initialise vendor UI (evidence capture checkbox)
   await tryResumeSession();
   // Only show previous sessions if we didn't auto-resume into one
   if (state.currentPhase === 1) loadPreviousSessions();
