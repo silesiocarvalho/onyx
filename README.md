@@ -1,42 +1,31 @@
 # Sariel v1.0.0 — Multi-Vendor Firewall Security Assessment Platform
 
 A web-based security assessment platform with automated SSH + Management API audit,
-AI-powered risk analysis (multi-provider via LiteLLM), security compliance mapping
-(NIST CSF 2.0, ISO 27001, PCI DSS, MITRE ATT&CK), manual review workbench,
-and multi-format report generation (PDF, Excel, CSV, Word).
+AI-powered risk analysis (multi-provider via LiteLLM), manual review workbench,
+and multi-format report generation (PDF, Excel, CSV, Word, Consulting Report).
 
 ---
 
-## Project Structure
+## Supported Vendors
 
-```
-onyx-1.0.0/
-├── backend/
-│   ├── main.py              ← FastAPI app (API Gateway + WebSocket)
-│   ├── credential_vault.py  ← Fernet-encrypted session-scoped credential store
-│   ├── session_manager.py   ← Session state machine + manual guidance
-│   ├── audit_runner.py      ← Background audit thread + WebSocket progress events
-│   └── persistence.py       ← Atomic JSON session persistence (no credentials)
-├── frontend/
-│   └── index.html           ← Single-page application (intake → audit → workbench → export)
-├── tools/
-│   ├── audit_tool.py        ← SSH + cpapi audit engine (61 CIS checks)
-│   ├── ai_analyzer.py       ← LiteLLM enrichment (3 passes: risk → chains → narrative)
-│   ├── report_generator.py  ← PDF / Excel / CSV / Word export
-│   └── compliance_mappings.py ← CIS → NIST CSF 2.0 / ISO 27001 / PCI DSS / MITRE ATT&CK
-├── data-source/             ← Reference PDFs (Admin Guide, API docs)
-├── security-compliance/     ← CIS Benchmark PDFs, NIST CSF, PCI DSS reference docs
-├── reports/                 ← Generated assessment reports saved here
-├── sessions/                ← Session state JSON files (no credentials)
-├── tests/
-│   └── test_backend.py      ← Integration tests (vault, sessions, API, reports)
-├── pyproject.toml           ← Dependencies (uv-managed)
-├── .python-version          ← Pins Python 3.12
-├── .env                     ← No real keys — per-session keys via intake form
-├── .mcp.json                ← CP MCP server config (dev-only, credentials via env vars)
-├── start.sh                 ← uv sync + uvicorn launcher
-└── README.md
-```
+| Vendor | Connection | Checks |
+|--------|-----------|--------|
+| Check Point Gaia R82 | SSH (Clish) + Management API | CIS Benchmark v1.1.0 |
+| Palo Alto PAN-OS 10+ | XML API + SSH fallback | CIS Benchmark v1.3.0 (82 checks) |
+
+---
+
+## Features
+
+- **Automated audit** — SSH + Management API checks with live terminal output
+- **AI enrichment** — per-finding risk analysis, attack chain correlation, executive narrative
+- **Multi-provider AI** — Anthropic, OpenAI, Groq, Gemini, Ollama (local) — per-session key
+- **Manual review workbench** — guided review for checks requiring human judgment
+- **Playwright evidence capture** — screenshots from the firewall UI embedded in reports
+- **Consulting Word report** — 7-section advisory narrative with priority matrix
+- **4 export formats** — PDF, Excel, CSV, Word (technical) + Consulting Word
+- **Session management** — multiple concurrent sessions, resume after restart
+- **Credential safety** — all credentials Fernet-encrypted in-memory, never written to disk
 
 ---
 
@@ -44,170 +33,82 @@ onyx-1.0.0/
 
 ### 1. Prerequisites
 
-```bash
-# Python 3.12+ and uv required
-uv --version   # install from https://docs.astral.sh/uv if missing
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) package manager
 
-# Install all dependencies
+```bash
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### 2. Clone and install
+
+```bash
+git clone https://github.com/silesiocarvalho/onyx.git
+cd onyx
 uv sync
 ```
 
-### 2. Start the Server
+### 3. Install Playwright browser (for evidence capture)
 
 ```bash
-# Preferred — loads .env and starts uvicorn
-bash start.sh
+uv run playwright install chromium
+```
 
-# Or directly
-uv run uvicorn backend.main:app --reload
+### 4. Start the server
+
+```bash
+bash start.sh
 ```
 
 Open your browser: **http://localhost:8000**
 
-### 3. (Optional) Use Claude Code for development
-
-```bash
-# Install Claude Code
-npm install -g @anthropic/claude-code
-
-# Launch from the project root
-cd onyx-1.0.0
-claude
-```
-
-Claude Code can help with:
-- Debugging SSH prompt regex (`audit_tool.py:GaiaClishSession._drain()`)
-- Fixing check regressions — paste the raw Clish output, get a targeted fix
-- Adding new CIS checks or adapting existing ones
-- Extending report formats or compliance mappings
-
-> **Before sharing any credentials with Claude Code, read the [Credential Safety warning](#️-warning--claude-code--credentials) below.**
-
 ---
 
-## Using the Tool
+## Usage
 
-### Phase 1 — Client Setup
-Fill in:
-- **Firewall IP** — the IP address you can SSH to
-- **Username / Password** — Gaia admin credentials
-- **CP Management API Key** — optional, enables Section 3 automated checks
-- **Anthropic API Key** — your `sk-ant-...` key for AI analysis
-- **Organization, Device Role, Industry** — context for the AI narrative
+### Step 1 — Fill in the intake form
+
+| Field | Description |
+|-------|-------------|
+| Vendor | Check Point or Palo Alto |
+| Firewall IP | IP address reachable via SSH or HTTPS |
+| Username / Password | Admin credentials |
+| Management API Key | CP: SmartConsole API key · PA: XML API key (optional, falls back to SSH) |
+| AI Provider + Key | Anthropic / OpenAI / Groq / Gemini / Ollama |
+| Organization, Role, Industry | Context for the AI narrative |
 
 Click **Start Assessment →**
 
-### Phase 2 — Automated Audit
-Watch the live terminal as 61 CIS checks run via SSH.
-After the audit, Claude API runs three analysis passes:
-1. Risk enrichment per finding
-2. Attack chain correlation
-3. Executive and technical narrative
+### Step 2 — Automated audit
 
-This takes 2–5 minutes depending on firewall response time and API latency.
+The live terminal streams check results in real time. After the audit completes,
+AI enrichment runs three passes: per-finding risk → attack chains → executive narrative.
 
-### Phase 3 — Manual Review
-The workbench shows all manual checks with:
-- Exact location in SmartConsole or Gaia
-- Step-by-step verification instructions
-- Pass/Fail criteria
-- Evidence and notes fields
+### Step 3 — Manual review
 
-Work through each check. Click **Save Finding** after each one.
-The progress bar fills as you complete checks.
+The workbench surfaces checks requiring human judgment with step-by-step guidance.
+Complete each check and click **Save Finding**.
 
-Once all checks are resolved, **Finalize Report →** becomes active.
+### Step 4 — Export
 
-### Phase 4 — Export
-Download:
-- **PDF** — client deliverable (cover page, exec summary, findings, attack chains)
-- **Excel** — 5-sheet workbook for GRC teams
-- **CSV** — flat file for import into tracking systems
+| Format | Description |
+|--------|-------------|
+| PDF | Cover page, exec summary, findings, attack chains |
+| Excel | Color-coded findings workbook |
+| CSV | Flat file for GRC tools |
+| Word (Technical) | Editable technical report |
+| Word (Consulting) | 7-section advisory report with priority matrix |
 
 ---
 
-## Testing Without a Firewall
-
-To test the UI and report pipeline without an actual firewall,
-use Claude Code:
-
-```
-Tell Claude Code:
-"Create a mock SSH session that returns realistic Gaia R82 
-Clish output for all audit_tool.py checks. Inject it so 
-the web app runs a full assessment against a fake device."
-```
-
-Or load a pre-existing raw JSON:
-- Place a `cis_audit_YYYYMMDD.json` in the `reports/` folder
-- Claude Code can wire the `/audit/start` endpoint to load it instead of SSH
-
----
-
-## Troubleshooting with Claude Code
-
-**SSH connects but commands return empty:**
-```
-"The Gaia Clish prompt on my firewall looks like 'hostname>'. 
-Debug the _drain() method in audit_runner.py and fix the 
-PROMPT_RE regex."
-```
-
-**A specific check returns ERROR:**
-```
-"Check 2.2.1 returns ERROR. The raw output from the firewall 
-was: [paste output]. Fix the regex in audit_tool.py check_2_2_1."
-```
-
-**WebSocket not connecting:**
-```
-"The WebSocket connection to /ws/{session_id} is failing.
-Read main.py and debug the connection. My browser shows: [error]"
-```
-
-**PDF layout issues:**
-```
-"The PDF cover page cuts off the executive summary text.
-Fix the ReportLab layout in report_generator.py."
-```
-
----
-
-## Security Notes
+## Security
 
 - Credentials are **never** stored on disk
 - Credentials are **never** sent to the AI model
-- All credentials are Fernet-encrypted in-memory (`CredentialVault`) for the session lifetime
-- All session data is destroyed on `DELETE /api/sessions/{id}` or when the server restarts
+- All credentials are Fernet-encrypted in-memory for the session lifetime
+- Sessions are destroyed on `DELETE /api/sessions/{id}` or server restart
 - The tool operates in **read-only** mode — no changes are made to the firewall
-
-### ⚠️ Warning — Claude Code & Credentials
-
-**Never type firewall passwords, Management API keys, or AI provider keys into a Claude Code chat message.**
-
-When credentials appear in a conversation, they are stored in the session's context for its duration and cannot be retroactively removed. This applies even though Claude Code does not persist conversations to disk.
-
-**Always enter credentials through the browser intake form** — credentials go directly to the encrypted `CredentialVault` and never appear in conversation history.
-
-If credentials were shared in a chat session:
-1. **Rotate the Management API key** — SmartConsole → Manage & Settings → Permissions & Administrators
-2. **Rotate the AI provider key** — from the provider dashboard (Groq, Anthropic, OpenAI, etc.)
-3. **Delete the conversation** — from claude.ai after the session ends
-4. **Delete the session** — `DELETE /api/sessions/{id}` to clear the in-memory vault
-
-### Using MCP Tools for Live Verification
-
-The `quantum-management` MCP server lets Claude Code query SmartConsole directly (e.g. to verify a disputed finding). MCP credentials must be set as **environment variables before starting Claude Code** — never written to `.mcp.json` directly.
-
-```bash
-export MANAGEMENT_HOST="<IP>"
-export API_KEY="<API_KEY>"
-export USERNAME="<USERNAME>"
-export PASSWORD="<PASSWORD>"
-claude   # MCP picks up env vars at startup
-```
-
-If MCP is not configured, Claude Code can verify findings directly via the `cpapi` SDK — credentials are passed inline, used in memory, and gone when the script exits. See `CLAUDE.md` for details.
 
 ---
 
@@ -215,13 +116,28 @@ If MCP is not configured, Claude Code can verify findings directly via the `cpap
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/sessions` | Create session, store credentials |
+| POST | `/api/sessions` | Create session |
 | GET | `/api/sessions/{id}` | Session state + summary |
-| POST | `/api/sessions/{id}/audit/start` | Start SSH audit (async) |
-| GET | `/api/sessions/{id}/workbench` | Manual checks + guidance |
+| POST | `/api/sessions/{id}/audit/start` | Start audit |
+| GET | `/api/sessions/{id}/workbench` | Manual checks |
 | POST | `/api/sessions/{id}/manual/{cid}` | Submit manual finding |
-| GET | `/api/sessions/{id}/report` | Current report JSON |
-| POST | `/api/sessions/{id}/report/finalize` | Finalize with AI pass |
-| GET | `/api/sessions/{id}/export/{fmt}` | Download PDF/Excel/CSV |
+| POST | `/api/sessions/{id}/report/finalize` | Finalize report |
+| GET | `/api/sessions/{id}/export/{fmt}` | Download PDF / Excel / CSV / docx |
+| GET | `/api/sessions/{id}/export/consulting` | Download consulting Word report |
 | DELETE | `/api/sessions/{id}` | Destroy session |
-| WS | `/ws/{id}` | Real-time progress stream |
+| WS | `/ws/{id}` | Real-time audit progress stream |
+
+---
+
+## Requirements
+
+| Package | Purpose |
+|---------|---------|
+| fastapi + uvicorn | Web framework + ASGI server |
+| paramiko | SSH client |
+| playwright | UI evidence capture |
+| litellm | Multi-provider AI |
+| cryptography | Fernet credential encryption |
+| reportlab | PDF generation |
+| openpyxl | Excel generation |
+| python-docx | Word generation |
