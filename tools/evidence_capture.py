@@ -106,18 +106,20 @@ class PANOSEvidenceCapture:
             self._page.wait_for_load_state("networkidle", timeout=20_000)
 
             # PAN-OS shows a MOTD dialog on a timer after init; wait for its mask then
-            # close all ExtJS windows so the UI is fully interactive.
+            # force-clear via Ext + DOM so the UI is fully interactive before any nav.
             try:
                 self._page.wait_for_selector(
                     ".ext-el-mask", state="visible", timeout=12_000
                 )
             except Exception:
                 pass  # no MOTD on this session — proceed
-            self._page.evaluate("""(function(){
-                if (typeof Ext !== 'undefined' && Ext.WindowMgr)
-                    Ext.WindowMgr.each(function(w){ try { w.close(); } catch(e){} });
-            })()""")
-            self._page.wait_for_timeout(800)
+            self._dismiss_masks()
+            try:
+                self._page.wait_for_selector(
+                    ".ext-el-mask", state="hidden", timeout=5_000
+                )
+            except Exception:
+                pass  # mask already gone or could not be confirmed hidden
 
             self._logged_in = True
             log.info("Evidence capture: logged in to %s", self._host)
@@ -138,19 +140,68 @@ class PANOSEvidenceCapture:
 
     # ── Navigation helpers ────────────────────────────────────────────────────
 
+    _DISMISS_JS = """(function(){
+        if (typeof Ext !== 'undefined') {
+            if (Ext.WindowMgr)
+                Ext.WindowMgr.each(function(w){ try { w.close(); } catch(e){} });
+            try { Ext.getBody().unmask(); } catch(e) {}
+        }
+        document.querySelectorAll('.ext-el-mask,.ext-el-mask-msg').forEach(function(el){
+            el.style.display      = 'none';
+            el.style.visibility   = 'hidden';
+            el.style.pointerEvents= 'none';
+        });
+    })()"""
+
+    def _dismiss_masks(self) -> None:
+        """Force-remove any ExtJS masks that would block pointer events."""
+        try:
+            self._page.evaluate(self._DISMISS_JS)
+        except Exception:
+            pass
+
     def _nav(self, top_label: str, sub_label: str) -> bool:
         """
         Click the top-level PAN-OS tab (DEVICE/NETWORK/OBJECTS/…) then the
         sidebar tree item (Licenses/Software/Zones/…).
-        Uses Playwright native clicks — masks are removed during connect().
+        Masks are dismissed before each click because PAN-OS re-masks on tab load.
         """
         try:
-            self._page.locator("a.x-pan-pageheader", has_text=top_label).click(
-                timeout=8_000
+            # Retry the top-tab click — PAN-OS re-shows the mask briefly during JS init,
+            # so the first attempt right after connect() may still be blocked.
+            for attempt in range(3):
+                self._dismiss_masks()
+                try:
+                    self._page.locator("a.x-pan-pageheader", has_text=top_label).click(
+                        timeout=5_000
+                    )
+                    break
+                except Exception:
+                    if attempt == 2:
+                        raise
+                    self._page.wait_for_timeout(2_000)
+
+            # Wait for the tab's loading mask to disappear before clicking the sidebar.
+            # Timeout is generous — first tab load takes longer than subsequent ones.
+            try:
+                self._page.wait_for_selector(".ext-el-mask", state="hidden", timeout=12_000)
+            except Exception:
+                pass
+            self._dismiss_masks()
+            # JS click bypasses any residual pointer-event interception from ExtJS masks
+            clicked = self._page.evaluate(
+                """(sub) => {
+                    var a = Array.from(document.querySelectorAll('a'))
+                                 .find(function(el){ return el.textContent.trim() === sub; });
+                    if (a) { a.click(); return true; }
+                    return false;
+                }""",
+                sub_label,
             )
+            if not clicked:
+                # Fallback: Playwright native click (works when no mask present)
+                self._page.locator("a", has_text=sub_label).first.click(timeout=8_000)
             self._page.wait_for_timeout(2_000)
-            self._page.locator("a", has_text=sub_label).first.click(timeout=8_000)
-            self._page.wait_for_timeout(3_000)
             return True
         except Exception as exc:
             log.debug("Evidence capture: nav %s>%s failed: %s", top_label, sub_label, exc)
@@ -217,3 +268,51 @@ class PANOSEvidenceCapture:
         except Exception as exc:
             log.warning("capture_dynamic_updates failed: %s", exc)
             return None
+
+
+# ---------------------------------------------------------------------------
+# Subprocess entry point — invoked by audit_runner via subprocess.run()
+# Reads JSON from stdin, writes JSON to stdout.
+# stdin:  {"host": "...", "username": "...", "password": "...", "methods": [...]}
+# stdout: {"capture_version": "base64...", "capture_licenses": null, ...}
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    import base64
+    import json
+    import sys
+    import logging as _logging
+
+    _logging.basicConfig(level=_logging.WARNING, stream=sys.stderr)
+
+    try:
+        payload  = json.loads(sys.stdin.read())
+        host     = payload["host"]
+        username = payload["username"]
+        password = payload["password"]
+        methods  = payload["methods"]
+    except Exception as e:
+        print(json.dumps({"error": f"bad_input: {e}"}))
+        sys.exit(1)
+
+    if not HAS_PLAYWRIGHT:
+        print(json.dumps({"error": "playwright_not_installed"}))
+        sys.exit(1)
+
+    cap = PANOSEvidenceCapture(host, username, password)
+    if not cap.connect():
+        print(json.dumps({"error": "login_failed"}))
+        sys.exit(1)
+
+    output: dict[str, str | None] = {}
+    try:
+        for method in methods:
+            fn = getattr(cap, method, None)
+            if fn is None:
+                output[method] = None
+                continue
+            img_bytes = fn()
+            output[method] = base64.b64encode(img_bytes).decode() if img_bytes else None
+    finally:
+        cap.close()
+
+    print(json.dumps(output))

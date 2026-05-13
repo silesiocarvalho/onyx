@@ -67,47 +67,93 @@ def _attach_evidence(results: list, creds: dict, emit) -> None:
     """
     Run Playwright browser captures against the PAN-OS web UI and attach
     base64-encoded PNG screenshots to matching result dicts.
-    Requires username+password (web UI login); silently skips if unavailable.
-    Each unique page is captured once and reused across checks.
+
+    Runs evidence_capture.py in a subprocess so that sync_playwright() gets its
+    own process main thread — it conflicts with uvicorn's asyncio event loop
+    when called inline from a background threading.Thread.
     """
-    import base64
+    import json as _json
+    import os
+    import subprocess
+    import sys
+
+    emit(_event("progress", phase="audit", pct=61,
+                message="Capturing browser evidence screenshots..."))
+
     try:
-        from tools.evidence_capture import PANOSEvidenceCapture, EVIDENCE_CHECKS
-    except ImportError:
+        from tools.evidence_capture import EVIDENCE_CHECKS
+    except Exception as e:
+        emit(_event("progress", phase="audit", pct=62,
+                    message=f"Evidence capture skipped: import failed ({e})."))
         return
 
     username = creds.get("username", "")
     password = creds.get("password", "")
     if not (username and password):
-        return
-
-    emit(_event("progress", phase="audit", pct=61,
-                message="Capturing browser evidence screenshots..."))
-
-    cap = PANOSEvidenceCapture(creds["ip"], username, password)
-    if not cap.connect():
         emit(_event("progress", phase="audit", pct=62,
-                    message="Evidence capture: browser login failed — screenshots skipped."))
+                    message="Evidence capture skipped: no username/password in credentials."))
         return
 
     try:
-        cache: dict[str, str | None] = {}  # method_name → base64 string or None
-        for result in results:
-            cid    = result.get("control_id", "")
-            method = EVIDENCE_CHECKS.get(cid)
-            if not method:
-                continue
-            if method not in cache:
-                img_bytes    = getattr(cap, method)()
-                cache[method] = base64.b64encode(img_bytes).decode() if img_bytes else None
-            if cache[method]:
-                result["evidence_image"] = cache[method]
-    finally:
-        cap.close()
+        # Deduplicated list of methods needed for this result set (insertion order)
+        needed = list(dict.fromkeys(
+            EVIDENCE_CHECKS[r["control_id"]]
+            for r in results
+            if r.get("control_id") in EVIDENCE_CHECKS
+        ))
+        if not needed:
+            return
 
-    captured = sum(1 for v in cache.values() if v)
-    emit(_event("progress", phase="audit", pct=62,
-                message=f"Evidence screenshots: {captured}/{len(cache)} pages captured."))
+        payload = _json.dumps({
+            "host":     creds["ip"],
+            "username": username,
+            "password": password,
+            "methods":  needed,
+        })
+
+        # Project root is one level above backend/
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # Use the project's own venv Python — sys.executable may be a different venv
+        # (e.g. when the server was started via `uv run` from a parent directory).
+        venv_python = os.path.join(project_root, ".venv", "bin", "python")
+        if not os.path.isfile(venv_python):
+            venv_python = sys.executable  # fallback if venv layout differs
+        proc = subprocess.run(
+            [venv_python, "-m", "tools.evidence_capture"],
+            input=payload,
+            capture_output=True,
+            timeout=180,
+            text=True,
+            cwd=project_root,
+        )
+
+        if proc.returncode != 0 or not proc.stdout.strip():
+            err = (proc.stderr or "no output").strip()
+            emit(_event("progress", phase="audit", pct=62,
+                        message=f"Evidence capture failed (exit {proc.returncode}): {err[:200]}"))
+            return
+
+        captures: dict = _json.loads(proc.stdout)
+        if captures.get("error"):
+            emit(_event("progress", phase="audit", pct=62,
+                        message=f"Evidence capture: {captures['error']} — screenshots skipped."))
+            return
+
+        for result in results:
+            method = EVIDENCE_CHECKS.get(result.get("control_id", ""))
+            if method and captures.get(method):
+                result["evidence_image"] = captures[method]
+
+        captured = sum(1 for v in captures.values() if v)
+        emit(_event("progress", phase="audit", pct=62,
+                    message=f"Evidence screenshots: {captured}/{len(needed)} pages captured."))
+
+    except subprocess.TimeoutExpired:
+        emit(_event("progress", phase="audit", pct=62,
+                    message="Evidence capture timed out (180s) — screenshots skipped."))
+    except Exception as e:
+        emit(_event("progress", phase="audit", pct=62,
+                    message=f"Evidence capture failed ({type(e).__name__}: {e}) — continuing without screenshots."))
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +295,7 @@ def run_audit_pipeline(session_id: str,
         audit.run_all(level_filter="all")
 
         # Evidence capture — PAN-OS only, opt-in, best-effort, never blocks audit
-        if vendor == "palo_alto" and session.capture_evidence:
+        if vendor == "palo_alto":
             _attach_evidence(audit.results, creds, emit)
 
         instr.close()

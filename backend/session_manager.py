@@ -244,9 +244,6 @@ class AssessmentSession:
         # Firewall vendor: "checkpoint" | "palo_alto"
         self.vendor: str = "checkpoint"
 
-        # Whether to run Playwright browser evidence capture (PAN-OS only)
-        self.capture_evidence: bool = False
-
         # Completion tracking
         self.total_manual = 0
         self.completed_manual = 0
@@ -390,7 +387,6 @@ class AssessmentSession:
         obj.ai_base_url      = data.get("ai_base_url", "")
         obj.frameworks        = data.get("frameworks", [])
         obj.vendor            = data.get("vendor", "checkpoint")
-        obj.capture_evidence  = data.get("capture_evidence", False)
         return obj
 
     @property
