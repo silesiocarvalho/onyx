@@ -44,7 +44,7 @@ SYSTEM_PROMPT = textwrap.dedent("""
     enterprise firewall platforms — Check Point Gaia, Palo Alto Networks PAN-OS,
     Fortinet FortiGate and FortiManager, and Cisco Firepower — as well as security
     frameworks including CIS Benchmarks, NIST CSF 2.0, ISO 27001, and PCI DSS.
-    You analyse audit findings from Sariel multi-vendor firewall security assessments
+    You analyse audit findings from FW AI Audit multi-vendor firewall security assessments
     and produce structured, actionable security intelligence.
     Respond ONLY with the JSON object requested — no preamble, no markdown fences,
     no commentary outside the JSON.
@@ -649,7 +649,7 @@ if __name__ == "__main__":
         "industry":     args.industry,
         "organization": args.organization,
         "target_ip":    meta.get("target", "Unknown"),
-        "benchmark":    meta.get("benchmark", "Sariel Security Assessment"),
+        "benchmark":    meta.get("benchmark", "FW AI Audit Security Assessment"),
     }
 
     cfg    = AIConfig(model=args.model, api_key=args.api_key, base_url=args.base_url)

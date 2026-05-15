@@ -117,7 +117,7 @@ def _read_version() -> str:
     except Exception:
         return "unknown"
 
-app = FastAPI(title="Sariel", version=_read_version(), lifespan=lifespan)
+app = FastAPI(title="FW AI Audit", version=_read_version(), lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -202,7 +202,7 @@ async def create_session(req: StartSessionRequest):
 
     # Store non-secret context in the session
     _VENDOR_BENCHMARKS = {
-        "checkpoint": "Sariel Security Assessment",
+        "checkpoint": "FW AI Audit Security Assessment",
         "palo_alto":  "CIS Palo Alto Firewall Benchmark",
     }
     session.vendor           = req.vendor
@@ -213,7 +213,7 @@ async def create_session(req: StartSessionRequest):
         "industry":     req.industry,
         "assessor_name": req.assessor_name,
         "vendor":        req.vendor,
-        "benchmark":     _VENDOR_BENCHMARKS.get(req.vendor, "Sariel Security Assessment"),
+        "benchmark":     _VENDOR_BENCHMARKS.get(req.vendor, "FW AI Audit Security Assessment"),
         "assessment_date": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -336,7 +336,7 @@ async def rerun_ai(session_id: str, req: RetryAIRequest):
 
             enriched_data = {
                 "meta": {
-                    "benchmark":      "Sariel Security Assessment",
+                    "benchmark":      "FW AI Audit Security Assessment",
                     "target":         ctx.get("target_ip", ""),
                     "generated":      datetime.now(timezone.utc).isoformat() + "Z",
                     "ai_model":       ai_cfg.model,

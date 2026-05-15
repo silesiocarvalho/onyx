@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sariel — Firewall Security Audit Engine
+FW AI Audit — Firewall Security Audit Engine
 Targets: Check Point Gaia R82 Standalone
 Author : Generated audit tool
 Usage  : python audit_tool.py -m <ip> -u <user> -p <pass> [options]
@@ -2030,7 +2030,7 @@ def print_report(results, target):
 
     print()
     print(colorize("=" * 70, CYAN))
-    print(colorize(f"  Sariel — Security Audit Report", BOLD))
+    print(colorize(f"  FW AI Audit — Security Audit Report", BOLD))
     print(colorize(f"  Target : {target}", BOLD))
     print(colorize(f"  Time   : {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC", BOLD))
     print(colorize("=" * 70, CYAN))
@@ -2073,7 +2073,7 @@ def print_report(results, target):
 def write_json_report(results, target, output_file):
     report = {
         "meta": {
-            "benchmark": "Sariel Security Assessment",
+            "benchmark": "FW AI Audit Security Assessment",
             "target":    target,
             "generated": datetime.datetime.utcnow().isoformat() + "Z",
             "tool":      "cis_gaia_audit_tool",
@@ -2098,7 +2098,7 @@ def write_json_report(results, target, output_file):
 # ---------------------------------------------------------------------------
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description="Sariel — Firewall Security Audit Engine",
+        description="FW AI Audit — Firewall Security Audit Engine",
         formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument('--management', '-m', default='127.0.0.1', metavar="",

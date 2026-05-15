@@ -191,7 +191,7 @@ def run_audit_pipeline(session_id: str,
 
         mgmt_client  = None   # CP Management API client (checkpoint only)
         total_checks = 61     # default (Check Point)
-        benchmark    = "Sariel Security Assessment"
+        benchmark    = "FW AI Audit Security Assessment"
 
         # ---- Palo Alto PAN-OS ----
         if vendor == "palo_alto":

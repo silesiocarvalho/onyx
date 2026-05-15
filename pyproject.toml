@@ -1,7 +1,7 @@
 [project]
-name = "sariel"
+name = "fw-ai-audit"
 version = "1.0.0"
-description = "Sariel — Multi-Vendor Firewall Security Assessment Platform"
+description = "FW AI Audit — Multi-Vendor Firewall Security Assessment Platform"
 requires-python = ">=3.11"
 
 dependencies = [

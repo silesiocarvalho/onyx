@@ -240,7 +240,7 @@ def _sheet_dashboard(wb, p):
     ws.row_dimensions[2].height = 40
     ws.row_dimensions[3].height = 24
     ws.merge_cells("B2:G2")
-    ws["B2"] = "Sariel Security Assessment"
+    ws["B2"] = "FW AI Audit Security Assessment"
     ws["B2"].font      = _xl_font(bold=True, size=18, color=COLORS["white"])
     ws["B2"].fill      = _xl_fill(COLORS["header"])
     ws["B2"].alignment = _xl_align("center")
@@ -248,7 +248,7 @@ def _sheet_dashboard(wb, p):
     ws.merge_cells("B3:G3")
     target = p["meta"].get("target", "Unknown")
     ts     = p["meta"].get("generated", "")[:19].replace("T", " ")
-    benchmark = p["meta"].get("benchmark", "Sariel Security Assessment")
+    benchmark = p["meta"].get("benchmark", "FW AI Audit Security Assessment")
     ws["B3"] = f"Target: {target}   |   Assessment: {ts}   |   {benchmark}"
     ws["B3"].font      = _xl_font(size=10, color=COLORS["white"])
     ws["B3"].fill      = _xl_fill(COLORS["accent"])
@@ -1082,7 +1082,7 @@ def _page_header_footer(canvas, doc):
     canvas.rect(0, h - 1.4*cm, w, 1.4*cm, fill=1, stroke=0)
     canvas.setFillColor(colors.white)
     canvas.setFont("Helvetica-Bold", 9)
-    canvas.drawString(1*cm, h - 0.9*cm, "Sariel — Security Assessment Report")
+    canvas.drawString(1*cm, h - 0.9*cm, "FW AI Audit — Security Assessment Report")
     canvas.setFont("Helvetica", 8)
     canvas.drawRightString(w - 1*cm, h - 0.9*cm, f"CONFIDENTIAL")
     # Footer bar
@@ -1107,7 +1107,7 @@ def generate_pdf(data: dict, output_path: str) -> str:
         pagesize=A4,
         topMargin=1.8*cm, bottomMargin=1.4*cm,
         leftMargin=1.6*cm, rightMargin=1.6*cm,
-        title="Sariel Security Assessment",
+        title="FW AI Audit Security Assessment",
         author="AI Audit Engine",
     )
     doc.set_header_footer(_page_header_footer)
@@ -1120,7 +1120,7 @@ def generate_pdf(data: dict, output_path: str) -> str:
     story.append(Spacer(1, 1.5*cm))
 
     # Cover banner
-    benchmark = meta.get("benchmark", "Sariel Security Assessment")
+    benchmark = meta.get("benchmark", "FW AI Audit Security Assessment")
     cover_data = [[_para(benchmark.upper(), st["title"])],
                   [_para("Security Assessment Report", st["subtitle"])]]
     cover_table = Table(cover_data, colWidths=[17*cm])
@@ -1147,7 +1147,7 @@ def generate_pdf(data: dict, output_path: str) -> str:
         ["Organization", org or "—"],
         ["Device Role", role or "—"],
         ["Industry", industry or "—"],
-        ["Framework", meta.get("benchmark", "Sariel Security Assessment")],
+        ["Framework", meta.get("benchmark", "FW AI Audit Security Assessment")],
         ["Classification", "CONFIDENTIAL"],
     ]
     info_table = Table(info_data, colWidths=[5*cm, 12*cm])
@@ -1598,7 +1598,7 @@ def generate_docx(data: dict, output_path: str) -> str:
     # ── Cover ──────────────────────────────────────────────────────────────
     title_para = doc.add_paragraph()
     title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = title_para.add_run("Sariel — Firewall Security Assessment")
+    run = title_para.add_run("FW AI Audit — Firewall Security Assessment")
     run.bold = True
     run.font.size = Pt(22)
     run.font.color.rgb = RGBColor(0x1A, 0x25, 0x2F)
@@ -1625,7 +1625,7 @@ def generate_docx(data: dict, output_path: str) -> str:
         ("Organization",    ctx.get("organization", "—")),
         ("Device Role",     ctx.get("device_role", "—")),
         ("Industry",        ctx.get("industry", "—")),
-        ("Framework",       meta.get("benchmark", "Sariel Security Assessment")),
+        ("Framework",       meta.get("benchmark", "FW AI Audit Security Assessment")),
         ("Classification",  "CONFIDENTIAL"),
         ("Overall Risk",    f"{overall}  |  Score: {score}%"),
     ]
@@ -2084,7 +2084,7 @@ def generate_consulting_docx(data: dict, output_path: str) -> str:
         ("Target Device",   target),
         ("Assessment Date", ts),
         ("Organization",    org),
-        ("Framework",       meta.get("benchmark", "CIS / Sariel Security Assessment")),
+        ("Framework",       meta.get("benchmark", "CIS / FW AI Audit Security Assessment")),
         ("Classification",  "CONFIDENTIAL"),
     ]
     cover_tbl = doc.add_table(rows=len(cover_rows), cols=2)

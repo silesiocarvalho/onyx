@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
-# start.sh — Launch Sariel inside a uv venv
+# start.sh — Launch FW AI Audit inside a uv venv
 #
 # First run:  bash start.sh          (installs deps + starts server)
 # Later runs: bash start.sh          (reuses existing venv)
@@ -22,8 +22,7 @@ fi
 
 echo ""
 echo "  ╔══════════════════════════════════════════╗"
-echo "  ║  Sariel — Firewall Security Assessment  ║"
-echo "  ║  Gaia R82 · CIS Benchmark v1.1.0        ║"
+echo "  ║     FW AI Audit — Firewall Security Assessment     ║"
 echo "  ╚══════════════════════════════════════════╝"
 echo ""
 
