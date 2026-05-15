@@ -1860,7 +1860,7 @@ _CONSULTING_MAP = [
 
 _PANOS_CONSULTING_MAP = [
     ("2", "Security Policy Review", [
-        ("2.1", "Application and Service Policy Controls",      ["7.1", "7.2"]),
+        ("2.1", "Application and Service Policy Controls",      ["7.1", "7.2", "7.5"]),
         ("2.2", "Threat Intelligence-Based Blocking",           ["7.3"]),
         ("2.3", "Default Security Policy Logging",              ["7.4"]),
     ]),
