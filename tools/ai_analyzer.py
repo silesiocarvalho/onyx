@@ -567,7 +567,30 @@ Generate a comprehensive security assessment narrative.
 Return a single JSON object exactly matching this schema:
 {json.dumps(NARRATIVE_SCHEMA, indent=2)}
 """
-    return _call_ai(cfg, prompt, max_tokens=MAX_TOKENS)
+    try:
+        result = _call_ai(cfg, prompt, max_tokens=MAX_TOKENS)
+        if isinstance(result, dict):
+            return result
+        print(f"  [AI] Narrative returned unexpected type {type(result).__name__} — using fallback", file=sys.stderr)
+    except Exception as e:
+        print(f"  [AI] Narrative generation failed (non-fatal): {e}", file=sys.stderr, flush=True)
+    return {
+        "overall_risk_rating": "Unknown",
+        "compliance_score_interpretation": "AI narrative generation failed — review findings manually.",
+        "executive_summary": {
+            "headline":    "AI narrative unavailable for this model.",
+            "paragraph_1": "The model did not return a structured JSON response.",
+            "paragraph_2": "Review the individual findings in the technical report.",
+            "paragraph_3": "Consider using a more capable model for narrative generation.",
+        },
+        "technical_summary": {
+            "paragraph_1": "See individual findings below.",
+            "paragraph_2": "",
+        },
+        "top_5_priority_actions": [],
+        "positive_findings":      "",
+        "assessment_limitations": "",
+    }
 
 
 # ---------------------------------------------------------------------------
