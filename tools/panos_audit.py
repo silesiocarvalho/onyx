@@ -47,6 +47,10 @@ class PANOSXMLAPISession:
         "show high-availability state": "<show><high-availability><state></state></high-availability></show>",
         "show system info":             "<show><system><info></info></system></show>",
         "show license":                 "<show><license></license></show>",
+        "show rule-hit-count vsys vsys1 rule-base security rules all":
+            "<show><rule-hit-count><vsys><vsys-name>vsys1</vsys-name>"
+            "<rule-base><entry name=\"security\"><rules><all/></rules></entry></rule-base>"
+            "</vsys></rule-hit-count></show>",
     }
 
     def __init__(self, host: str, port: int = 443):
@@ -200,7 +204,7 @@ class PANOSAudit:
     66 automated (PASS/FAIL/ERROR) + 12 manual (MANUAL).
     """
 
-    TOTAL_CHECKS = 82
+    TOTAL_CHECKS = 83
     BENCHMARK    = "CIS Palo Alto Firewall 10 Benchmark v1.3.0"
 
     def __init__(self, ssh_session):
@@ -2111,6 +2115,73 @@ class PANOSAudit:
             }
         ))
 
+    def _check_7_5(self):
+        raw = self._cmd("show rule-hit-count vsys vsys1 rule-base security rules all")
+        if not raw or "__ERROR__" in raw:
+            self._add(make_result(
+                "7.5", "Ensure security rules with zero hit count are reviewed", "L1", MANUAL,
+                expected="All security rules have been matched by traffic at least once",
+                actual="Hit-count data unavailable — verify manually in Policies > Security (hit count column)",
+                remediation="Policies > Security — enable hit count display; review and disable or remove rules with 0 hits.",
+                guidance={
+                    "where": "Policies > Security",
+                    "steps": [
+                        "In Policies > Security, right-click the column header and enable the Hit Count column",
+                        "Sort by Hit Count ascending to surface zero-hit rules",
+                        "For each zero-hit rule: determine if it was recently added, is a backup/DR rule, or is genuinely unused",
+                        "Disable or remove confirmed unused rules after change-control approval",
+                    ],
+                    "pass_criteria": "All enabled rules have a hit count > 0 or have a documented justification",
+                    "fail_criteria": "Enabled rules with 0 hits and no documented justification exist in the rulebase",
+                }
+            ))
+            return
+
+        zero_hit_rules = []
+        # XML API returns XML; SSH returns a text table — detect by leading '<'
+        if raw.lstrip().startswith("<"):
+            try:
+                root = ET.fromstring(raw)
+                for entry in root.findall(".//rules/entry"):
+                    name = entry.get("name", "")
+                    hc_el = entry.find("hit-count")
+                    if hc_el is not None and hc_el.text and hc_el.text.strip() == "0":
+                        zero_hit_rules.append(name)
+            except ET.ParseError:
+                pass
+        else:
+            # SSH tabular output: "rule-name    0    ..."
+            for line in raw.splitlines():
+                parts = line.split()
+                if len(parts) >= 2 and parts[-1] == "0":
+                    zero_hit_rules.append(parts[0])
+                elif len(parts) >= 2:
+                    # hit count is the second column in some PAN-OS versions
+                    try:
+                        if int(parts[1]) == 0:
+                            zero_hit_rules.append(parts[0])
+                    except (ValueError, IndexError):
+                        pass
+
+        if zero_hit_rules:
+            names_str = ", ".join(zero_hit_rules[:10])
+            suffix = f" (and {len(zero_hit_rules) - 10} more)" if len(zero_hit_rules) > 10 else ""
+            self._add(make_result(
+                "7.5", "Ensure security rules with zero hit count are reviewed", "L1", FAIL,
+                expected="All enabled security rules have been matched by traffic at least once",
+                actual=f"{len(zero_hit_rules)} rule(s) with 0 hits: {names_str}{suffix}",
+                remediation=(
+                    "Policies > Security — review each zero-hit rule. "
+                    "Disable or remove rules that are not required for DR/backup purposes. "
+                    "Document any intentionally kept zero-hit rules."
+                ),
+            ))
+        else:
+            self._add(make_result(
+                "7.5", "Ensure security rules with zero hit count are reviewed", "L1", PASS,
+                actual="All security rules have recorded at least one hit"
+            ))
+
     # ── Section 8: Decryption ─────────────────────────────────────────────────
 
     def _check_8_1(self):
@@ -2495,6 +2566,7 @@ class PANOSAudit:
         self._check_7_2()
         self._check_7_3()
         self._check_7_4()
+        self._check_7_5()
         # Section 8: Decryption
         self._check_8_1()
         self._check_8_2()
