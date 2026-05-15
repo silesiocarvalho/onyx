@@ -21,9 +21,9 @@ if [ -f "$PROJECT_DIR/.env" ]; then
 fi
 
 echo ""
-echo "  ╔══════════════════════════════════════════╗"
-echo "  ║     FW AI Audit — Firewall Security Assessment     ║"
-echo "  ╚══════════════════════════════════════════╝"
+echo "  ╔══════════════════════════════════════════════╗"
+echo "  ║  FW AI Audit — Firewall Security Assessment  ║"
+echo "  ╚══════════════════════════════════════════════╝"
 echo ""
 
 # ── 1. Check uv is installed ────────────────────────────────
