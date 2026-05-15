@@ -314,7 +314,8 @@ html, body {
   transition: border-color var(--transition);
   overflow: hidden;
 }
-.check-item.is-complete { border-color: var(--border-mid); }
+.check-item.is-complete { border-color: var(--border-mid); opacity: 0.6; }
+.check-item.is-complete:hover { opacity: 1; }
 .check-item.is-complete.pass-complete { border-left: 3px solid var(--mint); }
 .check-item.is-complete.fail-complete { border-left: 3px solid var(--crimson); }
 .check-item.is-complete.na-complete   { border-left: 3px solid var(--text-muted); }
@@ -558,7 +559,7 @@ html, body {
   <!-- ═══ HEADER ════════════════════════════════════════ -->
   <header class="header">
     <div class="header-logo">
-      <div class="logo-mark">FW AI Audit</div>
+      <div class="logo-mark">FW</div>
       <div class="logo-text"><strong>FW AI Audit</strong> &nbsp;·&nbsp; Firewall Security Assessment</div>
     </div>
     <div id="session-badge" class="session-badge" style="display:none">SESSION: <span id="session-id-display">—</span></div>
@@ -840,7 +841,7 @@ html, body {
         <div class="page-title">Manual Review</div>
         <div id="manual-score-chip" style="font-family:var(--font-mono);font-size:13px;color:var(--text-secondary)"></div>
       </div>
-      <p class="page-sub">Complete the checks that require SmartConsole or expert mode access. Resolve all items to enable finalization.</p>
+      <p class="page-sub">Complete the checks that require manual verification on the device. Resolve all items to enable finalization.</p>
 
       <!-- Completion gate -->
       <div class="gate-bar" id="gate-bar">
@@ -1529,7 +1530,7 @@ function renderWorkbench(items) {
         <div class="form-grid" style="gap:10px">
           <div class="field">
             <label>Evidence / Observation</label>
-            <textarea id="ev-${item.control_id}" placeholder="What did you see in SmartConsole or Clish?">${escHtml(saved.evidence||'')}</textarea>
+            <textarea id="ev-${item.control_id}" placeholder="What did you observe on the device?">${escHtml(saved.evidence||'')}</textarea>
           </div>
           <div class="field">
             <label>Assessor Notes</label>
