@@ -494,10 +494,11 @@ If fewer than 2 meaningful chains exist, return: []
 """
     result = _call_ai(cfg, prompt, max_tokens=4096)
     if isinstance(result, list):
-        return result
-    for v in result.values():
-        if isinstance(v, list):
-            return v
+        return [c for c in result if isinstance(c, dict)]
+    if isinstance(result, dict):
+        for v in result.values():
+            if isinstance(v, list):
+                return [c for c in v if isinstance(c, dict)]
     return []
 
 
