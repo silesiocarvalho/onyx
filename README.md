@@ -1,4 +1,4 @@
-# FW AI Audit v1.0.0 — Multi-Vendor Firewall Security Assessment Platform
+# FW AI Audit — Multi-Vendor Firewall Security Assessment Platform
 
 A web-based security assessment platform with automated SSH + Management API audit,
 AI-powered risk analysis (multi-provider via LiteLLM), security compliance mapping
